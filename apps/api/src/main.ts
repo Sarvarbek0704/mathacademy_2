@@ -1,3 +1,4 @@
+// src/main.ts - to'g'rilangan
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -12,7 +13,6 @@ declare global {
 function patchBigIntJson() {
   if (global.__bigint_json_patch_applied__) return;
   global.__bigint_json_patch_applied__ = true;
-
   (BigInt.prototype as any).toJSON = function () {
     return this.toString();
   };
@@ -30,24 +30,23 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {});
   const globalPrefix = 'api';
-  const port = Number(process.env.PORT) || 4000; // ✅ faqat shu yerda 1 marta
+  const port = Number(process.env.PORT) || 4000;
 
   app.setGlobalPrefix(globalPrefix);
   app.use(cookieParser());
 
+  // OSON YECHIM: process.env dan bevosita olamiz
+  const frontendPort = Number(process.env.WEB_PORT) || 3000;
   const allowList = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    `http://localhost:${port}`, // ✅ swagger origin uchun
-    `http://127.0.0.1:${port}`, // ✅ swagger origin uchun
+    `http://localhost:${frontendPort}`,
+    `http://127.0.0.1:${frontendPort}`,
+    `http://localhost:${port}`, // Swagger uchun
+    `http://127.0.0.1:${port}`,
     ...parseOrigins(process.env.WEB_ORIGINS),
   ];
 
   app.enableCors({
-    origin(origin, cb) {
-      if (!origin) return cb(null, true); // curl/postman
-      return cb(null, allowList.includes(origin)); // ❗ error throw qilmaymiz
-    },
+    origin: allowList,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -76,7 +75,6 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-
   SwaggerModule.setup(`${globalPrefix}/docs`, app, document, {
     swaggerOptions: { persistAuthorization: true },
   });

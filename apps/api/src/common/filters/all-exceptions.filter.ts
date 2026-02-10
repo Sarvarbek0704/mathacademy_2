@@ -8,7 +8,6 @@ import {
   InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -32,15 +31,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const statusCode = mapped.getStatus();
     const response = mapped.getResponse();
-
-    // HttpException response’idan message/error ni to‘g‘ri chiqaramiz
-    const { message, error } = this.extractHttpResponse(response, mapped);
+    const { message, error, code } = this.extractHttpResponse(response, mapped);
 
     const body: ErrorBody = {
       statusCode,
       message,
       error,
-      code: (response as any)?.code,
+      code,
       path: req?.originalUrl || req?.url,
       timestamp: new Date().toISOString(),
     };
@@ -51,45 +48,46 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private extractHttpResponse(
     response: string | object,
     ex: HttpException,
-  ): { message: string | string[]; error?: string } {
+  ): { message: string | string[]; error?: string; code?: string } {
     if (typeof response === 'string') {
       return { message: response, error: ex.name };
     }
     const r = response as any;
-    const msg = r?.message ?? ex.message ?? 'Error';
-    const err = r?.error ?? ex.name;
-    return { message: msg, error: err };
+    return {
+      message: r?.message ?? ex.message ?? 'ERROR',
+      error: r?.error ?? ex.name,
+      code: r?.code,
+    };
   }
 
   private map(exception: unknown): HttpException {
     if (exception instanceof HttpException) return exception;
 
-    // Prisma: known request errors (FK, unique, not found, etc.)
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       switch (exception.code) {
         case 'P2002':
           return new ConflictException({
-            message: 'Unique constraint violation',
-            code: 'UNIQUE_VIOLATION',
+            message: 'ALREADY_EXISTS',
+            code: 'ALREADY_EXISTS',
           });
         case 'P2003':
           return new BadRequestException({
-            message: 'Invalid reference (foreign key)',
-            code: 'FK_VIOLATION',
+            message: 'INVALID_REFERENCE',
+            code: 'INVALID_REFERENCE',
           });
         case 'P2025':
           return new NotFoundException({
-            message: 'Record not found',
-            code: 'RECORD_NOT_FOUND',
+            message: 'NOT_FOUND',
+            code: 'NOT_FOUND',
           });
         case 'P2000':
           return new BadRequestException({
-            message: 'Invalid value',
-            code: 'INVALID_VALUE',
+            message: 'INVALID_DATA',
+            code: 'INVALID_DATA',
           });
         default:
           return new InternalServerErrorException({
-            message: 'Database error',
+            message: 'DB_ERROR',
             code: 'DB_ERROR',
           });
       }
@@ -97,28 +95,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof Prisma.PrismaClientValidationError) {
       return new BadRequestException({
-        message: 'Invalid request data',
-        code: 'DB_VALIDATION',
+        message: 'INVALID_DATA',
+        code: 'INVALID_DATA',
       });
     }
 
     if (exception instanceof Prisma.PrismaClientInitializationError) {
       return new ServiceUnavailableException({
-        message: 'Database unavailable',
-        code: 'DB_INIT_ERROR',
+        message: 'DB_UNAVAILABLE',
+        code: 'DB_UNAVAILABLE',
       });
     }
 
-    if (exception instanceof Prisma.PrismaClientUnknownRequestError) {
-      return new InternalServerErrorException({
-        message: 'Database unknown error',
-        code: 'DB_UNKNOWN',
-      });
-    }
-
-    // fallback
     return new InternalServerErrorException({
-      message: 'Internal server error',
+      message: 'INTERNAL',
       code: 'INTERNAL',
     });
   }

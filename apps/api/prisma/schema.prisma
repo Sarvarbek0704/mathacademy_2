@@ -22,7 +22,6 @@ model academic_years {
   @@unique([tenant_id, name])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model announcements {
   id                 BigInt    @id @default(autoincrement())
   tenant_id          BigInt
@@ -51,7 +50,6 @@ model assessment_scores {
   @@id([assessment_id, student_id])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model assessments {
   id                        BigInt               @id @default(autoincrement())
   tenant_id                 BigInt
@@ -75,7 +73,6 @@ model assessments {
   discipline_actions        discipline_actions[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model attendance_marks {
   session_id          BigInt
   student_id          BigInt
@@ -87,7 +84,6 @@ model attendance_marks {
   @@id([session_id, student_id])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model attendance_sessions {
   id                 BigInt             @id @default(autoincrement())
   tenant_id          BigInt
@@ -104,7 +100,6 @@ model attendance_sessions {
   @@unique([group_id, session_date, type])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model audit_logs {
   id                       BigInt            @id @default(autoincrement())
   tenant_id                BigInt
@@ -136,7 +131,6 @@ model auth_attempts {
   tenants        tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model auth_locks {
   id             BigInt   @id @default(autoincrement())
   tenant_id      BigInt
@@ -167,7 +161,6 @@ model auth_sessions {
   users              users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model award_recipients {
   award_id       BigInt
   recipient_type String   @db.VarChar(10)
@@ -243,7 +236,6 @@ model cohorts {
   @@unique([tenant_id, label])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model competition_entries {
   id                  BigInt                @id @default(autoincrement())
   competition_id      BigInt

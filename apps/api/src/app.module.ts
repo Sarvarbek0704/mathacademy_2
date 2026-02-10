@@ -21,6 +21,7 @@ import { AwardsModule } from './modules/awards/awards.module';
 import { DisplaysModule } from './modules/displays/displays.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { validateEnv } from './common/config/env.validation';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { BillingModule } from './modules/billing/billing.module';
       isGlobal: true,
       cache: true,
       expandVariables: true,
+      validate: validateEnv,
     }),
     PrismaModule,
 
