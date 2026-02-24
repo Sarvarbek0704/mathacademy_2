@@ -55,7 +55,7 @@ export default function StudentsPage() {
     { key: 'grade', title: 'Sinf', render: (item) => <span className="font-medium">{item.grade || '-'}</span> },
     { key: 'group', title: 'Guruh', render: (item) => item.group?.name || item.groupName || '-' },
     { key: 'status', title: 'Status', render: (item) => <StatusBadge status={item.status || 'ACTIVE'} /> },
-    { key: 'livingType', title: 'Yashash turi', render: (item) => item.livingType || item.living_type || '-' },
+    { key: 'livingType', title: 'Yashash turi', render: (item) => (item.livingType?.name || item.living_type || '-') },
   ];
 
   const openCreate = () => {

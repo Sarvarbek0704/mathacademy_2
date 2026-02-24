@@ -201,22 +201,29 @@ export class TimetableService {
         name: timetable.name,
         createdBy: timetable.users?.full_name,
         createdAt: timetable.created_at,
-        lessons: timetable.timetable_lessons.map((l) => ({
-          id: l.id.toString(),
-          dayOfWeek: l.day_of_week,
-          periodNo: l.period_no,
-          subject: {
-            id: l.subjects.id.toString(),
-            name: l.subjects.name,
-            isCore: l.subjects.is_core,
-          },
-          teacher: l.users
-            ? { id: l.users.id.toString(), name: l.users.full_name }
-            : null,
-          room: l.room,
-          startsAt: l.starts_at,
-          endsAt: l.ends_at,
-        })),
+        lessons: timetable.timetable_lessons.map((l) => {
+          const startsAtStr = l.starts_at instanceof Date ? l.starts_at.toISOString().split('T')[1].substring(0, 5) : null;
+          const endsAtStr = l.ends_at instanceof Date ? l.ends_at.toISOString().split('T')[1].substring(0, 5) : null;
+          
+          return {
+            id: l.id.toString(),
+            dayOfWeek: l.day_of_week,
+            periodNo: l.period_no,
+            subject: {
+              id: l.subjects.id.toString(),
+              name: l.subjects.name,
+              isCore: l.subjects.is_core,
+            },
+            teacherId: l.teacher_user_id?.toString(),
+            teacherName: l.users?.full_name,
+            teacher: l.users
+              ? { id: l.users.id.toString(), name: l.users.full_name }
+              : null,
+            room: l.room,
+            startsAt: startsAtStr,
+            endsAt: endsAtStr,
+          };
+        }),
       };
     } catch (error) {
       rethrowServiceError(error);
@@ -445,8 +452,8 @@ export class TimetableService {
           teacherId: teacher_user_id?.toString(),
           teacherName: lesson.users?.full_name,
           room: lesson.room,
-          startsAt: lesson.starts_at,
-          endsAt: lesson.ends_at,
+          startsAt: lesson.starts_at instanceof Date ? lesson.starts_at.toISOString().split('T')[1].substring(0, 5) : null,
+          endsAt: lesson.ends_at instanceof Date ? lesson.ends_at.toISOString().split('T')[1].substring(0, 5) : null,
         };
       });
     } catch (error) {
@@ -579,8 +586,8 @@ export class TimetableService {
           teacherId: updated.teacher_user_id?.toString(),
           teacherName: updated.users?.full_name,
           room: updated.room,
-          startsAt: updated.starts_at,
-          endsAt: updated.ends_at,
+          startsAt: updated.starts_at instanceof Date ? updated.starts_at.toISOString().split('T')[1].substring(0, 5) : null,
+          endsAt: updated.ends_at instanceof Date ? updated.ends_at.toISOString().split('T')[1].substring(0, 5) : null,
         };
       });
     } catch (error) {

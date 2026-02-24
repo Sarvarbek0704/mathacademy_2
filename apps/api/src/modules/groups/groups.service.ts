@@ -132,7 +132,26 @@ export class GroupsService {
         }),
       ]);
 
-      return { total, limit, offset, items };
+      return { 
+        total, 
+        limit, 
+        offset, 
+        data: items.map(g => ({
+          id: g.id.toString(),
+          name: g.name,
+          grade: g.grade,
+          campusId: g.campus_id?.toString(),
+          academicYearId: g.academic_year_id?.toString(),
+          trackId: g.track_id?.toString(),
+          curatorUserId: g.curator_user_id?.toString(),
+          campus: g.campuses ? { id: g.campuses.id.toString(), name: g.campuses.name } : null,
+          academicYear: g.academic_years ? { id: g.academic_years.id.toString(), name: g.academic_years.name } : null,
+          track: g.student_tracks ? { id: g.student_tracks.id.toString(), name: g.student_tracks.name } : null,
+          curator: g.users ? { id: g.users.id.toString(), name: g.users.full_name } : null,
+          studentsCount: g._count?.students || 0,
+          subjectsCount: g._count?.group_subjects || 0
+        }))
+      };
     } catch (e) {
       mapPrismaError(e);
     }

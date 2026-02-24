@@ -33,6 +33,20 @@ export class CreateLessonDto {
   @Matches(/^\d+$/, { message: 'subjectId must be numeric string' })
   subjectId!: string;
 
+  @ApiProperty({ example: '09:00', description: 'Start time (HH:MM)' })
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'startsAt must be in HH:MM format',
+  })
+  startsAt!: string;
+
+  @ApiProperty({ example: '09:45', description: 'End time (HH:MM)' })
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'endsAt must be in HH:MM format',
+  })
+  endsAt!: string;
+
   @ApiPropertyOptional({
     example: '1',
     description: 'Teacher user ID (numeric string)',
@@ -46,20 +60,4 @@ export class CreateLessonDto {
   @IsOptional()
   @IsString()
   room?: string;
-
-  @ApiPropertyOptional({ example: '09:00', description: 'Start time (HH:MM)' })
-  @IsOptional()
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
-    message: 'startsAt must be in HH:MM format',
-  })
-  startsAt?: string;
-
-  @ApiPropertyOptional({ example: '09:45', description: 'End time (HH:MM)' })
-  @IsOptional()
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
-    message: 'endsAt must be in HH:MM format',
-  })
-  endsAt?: string;
 }

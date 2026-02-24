@@ -6,25 +6,32 @@ import { useCrud } from '@/hooks/useCrud';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Clock, 
-  Trash2, 
-  Edit2, 
-  Plus, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Clock,
+  Trash2,
+  Edit2,
+  Plus,
   Search,
   Loader2,
   Calendar,
   BookOpen,
   Users,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const WEEKDAYS = [
   { value: 'MONDAY', label: 'Dushanba' },
@@ -36,270 +43,841 @@ const WEEKDAYS = [
 ];
 
 const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '19:00',
+  '20:00',
 ];
 
 export default function TimetablePage() {
-  const { data: timetable, loading, create, remove, update } = useCrud({ endpoint: '/staff/timetables' });
+  const {
+    data: timetable,
+    loading,
+    create,
+    remove,
+    update,
+    refetch: refetchTimetables,
+  } = useCrud({ endpoint: '/staff/timetables' });
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [selectedTimetableId, setSelectedTimetableId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Get the currently selected timetable from the full list
+  const selectedTimetable = selectedTimetableId 
+    ? timetable?.find((t: any) => String(t.id) === selectedTimetableId)
+    : null;
 
-  const [form, setForm] = useState({ 
-    weekday: 'MONDAY', 
-    startTime: '09:00', 
-    endTime: '10:30', 
-    subjectId: '', 
-    groupId: '', 
-    roomId: '' 
+  // Fetch detailed timetable when one is selected
+  const { 
+    data: detailedTimetable, 
+    isLoading: loadingDetails, 
+    refetch: refetchDetails 
+  } = useQuery({
+    queryKey: ['staff', 'timetables', 'detail', selectedTimetableId],
+    queryFn: async () => {
+      if (!selectedTimetableId) return null;
+      const res = await api.get(`/staff/timetables/${selectedTimetableId}`);
+      return res.data;
+    },
+    enabled: !!selectedTimetableId,
   });
+
+  const activeTimetable = detailedTimetable || selectedTimetable;
+  const isLoading = loading || (selectedTimetableId && loadingDetails);
+
+  const [form, setForm] = useState({
+    dayOfWeek: 1,
+    periodNo: 1,
+    subjectId: '',
+    teacherUserId: '',
+    room: '',
+    startsAt: '09:00',
+    endsAt: '10:30',
+  });
+
+  const [timetableForm, setTimetableForm] = useState({
+    name: '',
+    groupId: '',
+    academicYearId: '',
+  });
+  const [isCreatingTimetable, setIsCreatingTimetable] = useState(false);
 
   const { data: subjectsRes } = useQuery({
     queryKey: ['staff', 'subjects', 'for_timetable'],
-    queryFn: async () => (await api.get('/staff/subjects?limit=100')).data
+    queryFn: async () => {
+      const res = await api.get('/staff/subjects?limit=100');
+      return res.data?.data || [];
+    },
   });
-  const subjects = subjectsRes?.items || [];
+  const subjects = subjectsRes || [];
 
   const { data: groupsRes } = useQuery({
     queryKey: ['staff', 'groups', 'for_timetable'],
-    queryFn: async () => (await api.get('/staff/groups?limit=100')).data
+    queryFn: async () => {
+      const res = await api.get('/staff/groups?limit=100');
+      return res.data?.data || [];
+    },
   });
-  const groups = groupsRes?.items || [];
+  const groups = groupsRes || [];
+
+  const { data: academicYearsRes } = useQuery({
+    queryKey: ['academic-years', 'for_timetable'],
+    queryFn: async () => {
+      const res = await api.get('/staff/academic-years?limit=100');
+      return res.data?.data || [];
+    },
+  });
+  const academicYears = academicYearsRes || [];
+
+  const { data: teachersRes } = useQuery({
+    queryKey: ['staff', 'users', 'teachers'],
+    queryFn: async () => {
+      const res = await api.get('/staff/users?limit=100');
+      return res.data?.data || [];
+    },
+  });
+  const teachers = teachersRes || [];
 
   const handleCreateOrUpdate = async () => {
-    if (isEditing) {
-      await update(selectedSlot.id, form);
-    } else {
-      await create(form);
+    if (!form.subjectId || !form.startsAt || !form.endsAt) {
+      toast.error("Barcha majburiy maydonlarni to'ldiring");
+      return;
     }
-    setModalOpen(false);
+
+    if (!selectedTimetable) {
+      toast.error('Jadval tanlamayn turibdi');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        dayOfWeek: form.dayOfWeek,
+        periodNo: form.periodNo,
+        subjectId: form.subjectId,
+        teacherUserId: form.teacherUserId === 'none' ? null : (form.teacherUserId || null),
+        room: form.room || null,
+        startsAt: form.startsAt,
+        endsAt: form.endsAt,
+      };
+
+      if (isEditing && selectedSlot) {
+        await api.patch(
+          `/staff/timetables/${selectedTimetable.id}/lessons/${selectedSlot.id}`,
+          payload,
+        );
+        toast.success('Dars muvaffaqiyatli yangilandi');
+      } else {
+        await api.post(`/staff/timetables/${selectedTimetable.id}/lessons`, payload);
+        toast.success("Dars muvaffaqiyatli qo'shildi");
+      }
+
+      // Invalidate and refetch timetables
+      await refetchTimetables();
+      if (selectedTimetableId) {
+        await refetchDetails();
+      }
+
+      setModalOpen(false);
+      setForm({
+        dayOfWeek: 1,
+        periodNo: 1,
+        subjectId: '',
+        teacherUserId: '',
+        room: '',
+        startsAt: '09:00',
+        endsAt: '10:30',
+      });
+      setIsEditing(false);
+      setSelectedSlot(null);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Xatolik yuz berdi';
+      toast.error(message);
+      console.error('Error saving lesson:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const getSlotForDayAndTime = (day: string, time: string) => {
-    return timetable.filter((s: any) => s.weekday === day && s.startTime.startsWith(time.split(':')[0]));
+  const handleCreateTimetable = async () => {
+    if (!timetableForm.name.trim() || !timetableForm.groupId || !timetableForm.academicYearId) {
+      toast.error("Barcha majburiy maydonlarni to'ldiring");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        name: timetableForm.name.trim(),
+        groupId: timetableForm.groupId,
+        academicYearId: timetableForm.academicYearId,
+      };
+
+      if (selectedTimetable && selectedTimetable.id) {
+        // Update existing timetable
+        await api.patch(`/staff/timetables/${selectedTimetable.id}`, payload);
+        toast.success('Jadval muvaffaqiyatli yangilandi');
+      } else {
+        // Create new timetable
+        await create(payload);
+        toast.success('Jadval muvaffaqiyatli yaratildi');
+      }
+
+      setTimetableForm({ name: '', groupId: '', academicYearId: '' });
+      setIsCreatingTimetable(false);
+      setSelectedTimetableId(null);
+      setModalOpen(false);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Jadval yaratishda xatolik yuz berdi';
+      toast.error(message);
+      console.error('Error creating/updating timetable:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Dars jadvali" 
-        description="Haftalik darslar va xonalar taqsimoti" 
-        action={{ 
-          label: "Dars qo'shish", 
+      <PageHeader
+        title="Dars jadvali"
+        description="Haftalik darslar va xonalar taqsimoti"
+        action={{
+          label: 'Jadval yaratish',
           icon: <Plus className="h-4 w-4" />,
           onClick: () => {
-            setForm({ weekday: 'MONDAY', startTime: '09:00', endTime: '10:30', subjectId: '', groupId: '', roomId: '' });
-            setIsEditing(false);
+            setIsCreatingTimetable(true);
+            setTimetableForm({ name: '', groupId: '', academicYearId: '' });
+            setSelectedTimetableId(null);
             setModalOpen(true);
-          }
-        }} 
+          },
+        }}
       />
 
-      <div className="flex items-center justify-between">
-        <div className="flex bg-muted p-1 rounded-lg">
-          <Button 
-            variant={viewMode === 'GRID' ? 'secondary' : 'ghost'} 
-            size="sm" 
-            className="h-8"
-            onClick={() => setViewMode('GRID')}
-          >
-            Grid ko'rinishi
-          </Button>
-          <Button 
-            variant={viewMode === 'LIST' ? 'secondary' : 'ghost'} 
-            size="sm" 
-            className="h-8"
-            onClick={() => setViewMode('LIST')}
-          >
-            Ro'yxat
-          </Button>
-        </div>
-      </div>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="flex-1 md:flex-none md:w-64">
+            <Label htmlFor="tt-select" className="mb-2 block">
+              Jadval tanlang
+            </Label>
+            <Select value={selectedTimetableId || ''} onValueChange={setSelectedTimetableId}>
+              <SelectTrigger id="tt-select">
+                <SelectValue placeholder="Jadvalni tanlang..." />
+              </SelectTrigger>
+              <SelectContent>
+                {timetable?.map((tt: any) => (
+                  <SelectItem key={tt.id} value={String(tt.id)}>
+                    {tt.name} • {tt.group?.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {loading ? (
+          <div className="flex bg-muted p-1 rounded-lg">
+            <Button
+              variant={viewMode === 'GRID' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8"
+              onClick={() => setViewMode('GRID')}
+              disabled={!selectedTimetable}
+            >
+              Grid ko'rinishi
+            </Button>
+            <Button
+              variant={viewMode === 'LIST' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8"
+              onClick={() => setViewMode('LIST')}
+              disabled={!selectedTimetable}
+            >
+              Ro'yxat
+            </Button>
+          </div>
+        </div>
+
+      {!activeTimetable && !isLoading ? (
+        <div className="flex h-32 items-center justify-center rounded-lg border border-dashed">
+          <p className="text-muted-foreground">Jadvalni tanlang</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
         </div>
-      ) : viewMode === 'GRID' ? (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-          <div className="min-w-[1000px]">
-            {/* Header */}
-            <div className="grid grid-cols-[100px_repeat(6,1fr)] border-b bg-muted/30">
-              <div className="p-3 border-r" />
-              {WEEKDAYS.map(day => (
-                <div key={day.value} className="p-3 text-center border-r last:border-r-0">
-                  <span className="text-xs font-bold uppercase tracking-wider">{day.label}</span>
-                </div>
-              ))}
+      ) : viewMode === 'GRID' && activeTimetable ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+            <div>
+              <h3 className="text-lg font-bold">{activeTimetable.name}</h3>
+              <p className="text-xs text-muted-foreground">
+                {activeTimetable.groupName || activeTimetable.group?.name} • {activeTimetable.academicYearName || activeTimetable.academicYear?.name}
+              </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Badge>{activeTimetable.lessons?.length || activeTimetable.lessonsCount || 0} dars</Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  setTimetableForm({
+                    name: activeTimetable.name,
+                    groupId: String(activeTimetable.groupId || ''),
+                    academicYearId: String(activeTimetable.academicYearId || ''),
+                  });
+                  setIsCreatingTimetable(true);
+                  setModalOpen(true);
+                }}
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive"
+                onClick={() => {
+                  setSelectedSlot(null);
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-            {/* Grid Body */}
-            {TIME_SLOTS.map(time => (
-              <div key={time} className="grid grid-cols-[100px_repeat(6,1fr)] border-b last:border-b-0 group">
-                <div className="p-3 border-r bg-muted/10 flex items-center justify-center">
-                  <span className="text-[11px] font-mono font-medium text-muted-foreground">{time}</span>
+              <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+                <div className="min-w-[900px]">
+                  {/* Header */}
+                  <div className="grid grid-cols-[120px_repeat(6,1fr)] border-b bg-muted/30">
+                    <div className="p-3" />
+                    {[
+                      { value: 1, label: 'Dushanba' },
+                      { value: 2, label: 'Seshanba' },
+                      { value: 3, label: 'Chorshanba' },
+                      { value: 4, label: 'Payshanba' },
+                      { value: 5, label: 'Juma' },
+                      { value: 6, label: 'Shanba' },
+                    ].map((day) => (
+                      <div key={day.value} className="p-3 text-center border-r last:border-r-0">
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {day.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Body */}
+                  {TIME_SLOTS.map((time) => (
+                    <div
+                      key={time}
+                      className="grid grid-cols-[120px_repeat(6,1fr)] border-b last:border-b-0"
+                    >
+                      <div className="p-3 border-r bg-muted/10 flex items-center justify-center">
+                        <span className="text-xs font-mono font-medium text-muted-foreground">
+                          {time}
+                        </span>
+                      </div>
+                      {[1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
+                        const lessons =
+                          activeTimetable.lessons?.filter(
+                            (l: any) =>
+                              l.dayOfWeek === dayOfWeek &&
+                              l.startsAt?.startsWith(time.split(':')[0]),
+                          ) || [];
+                        return (
+                          <div
+                            key={`${selectedTimetable.id}-${dayOfWeek}-${time}`}
+                            className="p-1.5 border-r last:border-r-0 min-h-[80px] hover:bg-muted/5 transition-colors relative group/cell"
+                          >
+                            {lessons.map((lesson: any) => (
+                              <div
+                                key={lesson.id}
+                                className="mb-1 rounded-md border p-2 text-xs bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all cursor-pointer group/lesson relative"
+                                onClick={() => {
+                                  setSelectedSlot(lesson);
+                                  setForm({
+                                    dayOfWeek: lesson.dayOfWeek,
+                                    periodNo: lesson.periodNo,
+                                    subjectId: String(lesson.subjectId || lesson.subject?.id || ''),
+                                    teacherUserId: String(lesson.teacherUserId || lesson.teacherId || ''),
+                                    room: lesson.room || '',
+                                    startsAt: lesson.startsAt || '09:00',
+                                    endsAt: lesson.endsAt || '10:30',
+                                  });
+                                  setIsEditing(true);
+                                  setModalOpen(true);
+                                }}
+                              >
+                                <div className="font-bold line-clamp-1 text-blue-900 dark:text-blue-100 pr-4">
+                                  {lesson.subject?.name || 'Fan'}
+                                </div>
+                                <div className="text-[10px] text-blue-700 dark:text-blue-300 mt-0.5 font-medium">
+                                  {lesson.teacherName || lesson.teacher?.name || 'Ustoz biriktirilmagan'}
+                                </div>
+                                <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {lesson.startsAt}-{lesson.endsAt}
+                                </div>
+
+                                <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover/lesson:opacity-100 transition-opacity">
+                                  <button
+                                    className="h-5 w-5 rounded bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-white transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedSlot(lesson);
+                                      setDeleteOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            <button
+                              className="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-primary/20 text-primary flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity hover:bg-primary hover:text-white"
+                              onClick={() => {
+                                setForm({
+                                  dayOfWeek,
+                                  periodNo: parseInt(time.split(':')[0]) - 7,
+                                  subjectId: '',
+                                  teacherUserId: '',
+                                  room: '',
+                                  startsAt: time,
+                                  endsAt: '',
+                                });
+                                setIsEditing(false);
+                                setModalOpen(true);
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-                {WEEKDAYS.map(day => {
-                  const slots = getSlotForDayAndTime(day.value, time);
-                  return (
-                    <div key={`${day.value}-${time}`} className="p-1.5 border-r last:border-r-0 min-h-[80px] hover:bg-muted/5 transition-colors relative group/day">
-                      {slots.map((s: any) => (
-                        <div 
-                          key={s.id} 
-                          className="mb-1 rounded-md border p-2 text-xs bg-primary/5 border-primary/20 hover:bg-primary/10 transition-all cursor-pointer group/slot relative"
+              </div>
+            </div>
+          ) : viewMode === 'LIST' && activeTimetable ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+                <div>
+                  <h3 className="text-lg font-bold">{activeTimetable.name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {activeTimetable.groupName || activeTimetable.group?.name} • {activeTimetable.academicYearName || activeTimetable.academicYear?.name}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge>{activeTimetable.lessons?.length || activeTimetable.lessonsCount || 0} dars</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setTimetableForm({
+                        name: activeTimetable.name,
+                        groupId: String(activeTimetable.groupId || ''),
+                        academicYearId: String(activeTimetable.academicYearId || ''),
+                      });
+                      setIsCreatingTimetable(true);
+                      setModalOpen(true);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => {
+                      setSelectedSlot(null);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {activeTimetable.lessons?.length > 0 ? (
+                <div className="space-y-2">
+                  {activeTimetable.lessons.map((lesson: any) => (
+                    <div
+                      key={lesson.id}
+                      className="flex items-start justify-between p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
+                    >
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm">{lesson.subject?.name || 'Fan'}</p>
+                          <Badge variant="outline" className="text-[10px] py-0 h-4">
+                            {lesson.teacherName || lesson.teacher?.name || 'Ustozsiz'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5 inline mr-1" />
+                          {
+                            [
+                              { value: 1, label: 'Dushanba' },
+                              { value: 2, label: 'Seshanba' },
+                              { value: 3, label: 'Chorshanba' },
+                              { value: 4, label: 'Payshanba' },
+                              { value: 5, label: 'Juma' },
+                              { value: 6, label: 'Shanba' },
+                            ].find((w) => w.value === lesson.dayOfWeek)?.label
+                          }{' '}
+                          - {lesson.startsAt}-{lesson.endsAt}
+                        </p>
+                        {lesson.room && (
+                          <p className="text-xs text-muted-foreground">Xona: {lesson.room}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
                           onClick={() => {
-                            setSelectedSlot(s);
-                            setForm({ 
-                              weekday: s.weekday, 
-                              startTime: s.startTime, 
-                              endTime: s.endTime, 
-                              subjectId: String(s.subjectId || ''), 
-                              groupId: String(s.groupId || ''), 
-                              roomId: s.roomId || '' 
+                            setSelectedSlot(lesson);
+                            setForm({
+                              dayOfWeek: lesson.dayOfWeek,
+                              periodNo: lesson.periodNo,
+                              subjectId: String(lesson.subjectId || lesson.subject?.id || ''),
+                              teacherUserId: String(lesson.teacherUserId || lesson.teacherId || ''),
+                              room: lesson.room || '',
+                              startsAt: lesson.startsAt || '09:00',
+                              endsAt: lesson.endsAt || '10:30',
                             });
                             setIsEditing(true);
                             setModalOpen(true);
                           }}
                         >
-                          <div className="font-bold line-clamp-1">{s.subject?.name || 'Fan'}</div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
-                            <Users className="h-3 w-3" /> {s.group?.name || 'Guruh'}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> {s.startTime}-{s.endTime}
-                          </div>
-                          <button 
-                            className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive/10 text-destructive flex items-center justify-center opacity-0 group-hover/slot:opacity-100 transition-opacity"
-                            onClick={(e) => { e.stopPropagation(); setSelectedSlot(s); setDeleteOpen(true); }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <button 
-                        className="absolute bottom-1 right-1 h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center opacity-0 group-hover/day:opacity-100 transition-opacity hover:bg-primary hover:text-white"
-                        onClick={() => {
-                          setForm({ weekday: day.value, startTime: time, endTime: '', subjectId: '', groupId: '', roomId: '' });
-                          setIsEditing(false);
-                          setModalOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => {
+                            setSelectedSlot(lesson);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground">Hech qanday dars yo'q</p>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-           {timetable.map((s: any) => (
-             <Card key={s.id} className="group hover:border-primary/50 transition-all">
-               <CardContent className="p-4 space-y-3">
-                 <div className="flex justify-between items-start">
-                   <Badge variant="secondary" className="text-[10px]">
-                     {WEEKDAYS.find(w => w.value === s.weekday)?.label}
-                   </Badge>
-                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                        setSelectedSlot(s);
-                        setForm({ 
-                          weekday: s.weekday, 
-                          startTime: s.startTime, 
-                          endTime: s.endTime, 
-                          subjectId: String(s.subjectId || ''), 
-                          groupId: String(s.groupId || ''), 
-                          roomId: s.roomId || '' 
-                        });
-                        setIsEditing(true);
-                        setModalOpen(true);
-                     }}> <Edit2 className="h-3.5 w-3.5" /> </Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setSelectedSlot(s); setDeleteOpen(true); }}> <Trash2 className="h-3.5 w-3.5" /> </Button>
-                   </div>
-                 </div>
-                 <div>
-                   <h4 className="font-bold text-sm">{s.subject?.name}</h4>
-                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                     <Users className="h-3.5 w-3.5" /> {s.group?.name}
-                   </p>
-                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                     <Clock className="h-3.5 w-3.5" /> {s.startTime} - {s.endTime}
-                   </p>
-                 </div>
-               </CardContent>
-             </Card>
-           ))}
-        </div>
-      )}
-
       {/* Form SlideOver */}
-      <SlideOver open={modalOpen} onOpenChange={setModalOpen} title={isEditing ? "Darsni tahrirlash" : "Yangi dars qo'shish"} size="sm">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Label>Hafta kuni</Label>
-            <Select value={form.weekday} onValueChange={v => setForm({ ...form, weekday: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {WEEKDAYS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+      <SlideOver
+        open={modalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) {
+            setIsCreatingTimetable(false);
+            setIsEditing(false);
+          }
+        }}
+        title={
+          isCreatingTimetable
+            ? selectedTimetable && selectedTimetable.id
+              ? 'Jadvalni tahrirlash'
+              : 'Jadval yaratish'
+            : isEditing
+              ? 'Darsni tahrirlash'
+              : "Yangi dars qo'shish"
+        }
+        size="sm"
+      >
+        {isCreatingTimetable ? (
+          <div className="space-y-6 pt-4">
             <div className="space-y-2">
-              <Label>Boshlanish vaqti</Label>
-              <Input type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} />
+              <Label htmlFor="tt-name">Jadval nomi *</Label>
+              <Input
+                id="tt-name"
+                value={timetableForm.name}
+                onChange={(e) => setTimetableForm({ ...timetableForm, name: e.target.value })}
+
+                placeholder="Masalan: 10-A sinfi jadavali"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label>Tugash vaqti</Label>
-              <Input type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} />
+              <Label htmlFor="tt-group">Guruh *</Label>
+              <Select
+                value={timetableForm.groupId}
+                onValueChange={(v) => setTimetableForm({ ...timetableForm, groupId: v })}
+              >
+                <SelectTrigger id="tt-group">
+                  <SelectValue placeholder="Guruhni tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((g: any) => (
+                    <SelectItem key={g.id} value={String(g.id)}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tt-ay">O'quv yili *</Label>
+              <Select
+                value={timetableForm.academicYearId}
+                onValueChange={(v) => setTimetableForm({ ...timetableForm, academicYearId: v })}
+              >
+                <SelectTrigger id="tt-ay">
+                  <SelectValue placeholder="O'quv yilini tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYears.map((ay: any) => (
+                    <SelectItem key={ay.id} value={String(ay.id)}>
+                      {ay.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setModalOpen(false);
+                  setIsCreatingTimetable(false);
+                }}
+                disabled={isSubmitting}
+              >
+                Bekor qilish
+              </Button>
+              <Button
+                className="w-full sm:w-auto"
+                onClick={handleCreateTimetable}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saqlanyapti...
+                  </>
+                ) : selectedTimetable && selectedTimetable.id ? (
+                  'Jadvalni yangilash'
+                ) : (
+                  'Jadval yaratish'
+                )}
+              </Button>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label>Fan</Label>
-            <Select value={form.subjectId} onValueChange={v => setForm({ ...form, subjectId: v })}>
-              <SelectTrigger><SelectValue placeholder="Fanni tanlang" /></SelectTrigger>
-              <SelectContent>
-                {subjects.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+        ) : !selectedTimetable ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground">
+            Dars qo'shish uchun jadvalni tanlang
           </div>
+        ) : (
+          <div className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="dayofweek">Hafta kuni *</Label>
+              <Select
+                value={String(form.dayOfWeek)}
+                onValueChange={(v) => setForm({ ...form, dayOfWeek: parseInt(v, 10) })}
+              >
+                <SelectTrigger id="dayofweek">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: 1, label: 'Dushanba' },
+                    { value: 2, label: 'Seshanba' },
+                    { value: 3, label: 'Chorshanba' },
+                    { value: 4, label: 'Payshanba' },
+                    { value: 5, label: 'Juma' },
+                    { value: 6, label: 'Shanba' },
+                    { value: 7, label: 'Yakshanba' },
+                  ].map((d) => (
+                    <SelectItem key={d.value} value={String(d.value)}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Guruh</Label>
-            <Select value={form.groupId} onValueChange={v => setForm({ ...form, groupId: v })}>
-              <SelectTrigger><SelectValue placeholder="Guruhni tanlang" /></SelectTrigger>
-              <SelectContent>
-                {groups.map((g: any) => <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="periodo">Dars raqami (Periodo) *</Label>
+              <Input
+                id="periodo"
+                type="number"
+                min="1"
+                value={form.periodNo}
+                onChange={(e) => setForm({ ...form, periodNo: parseInt(e.target.value, 10) || 1 })}
+                placeholder="1, 2, 3..."
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Xona / Manzil</Label>
-            <Input value={form.roomId} onChange={e => setForm({ ...form, roomId: e.target.value })} placeholder="Masalan: 301-xona" />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="subject">Fan *</Label>
+              <Select
+                value={form.subjectId}
+                onValueChange={(v) => setForm({ ...form, subjectId: v })}
+              >
+                <SelectTrigger id="subject">
+                  <SelectValue placeholder="Fanni tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setModalOpen(false)}>Bekor qilish</Button>
-            <Button className="w-full sm:w-auto" onClick={handleCreateOrUpdate}>Saqlash</Button>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="starttime">Boshlanish vaqti</Label>
+                <Input
+                  id="starttime"
+                  type="time"
+                  value={form.startsAt}
+                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endtime">Tugash vaqti</Label>
+                <Input
+                  id="endtime"
+                  type="time"
+                  value={form.endsAt}
+                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="room">Xona / Manzil</Label>
+              <Input
+                id="room"
+                value={form.room}
+                onChange={(e) => setForm({ ...form, room: e.target.value })}
+                placeholder="Masalan: 301-xona"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="teacher">O'qituvchi</Label>
+              <Select
+                value={form.teacherUserId}
+                onValueChange={(v) => setForm({ ...form, teacherUserId: v })}
+              >
+                <SelectTrigger id="teacher">
+                  <SelectValue placeholder="O'qituvchini tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Biriktirilmagan</SelectItem>
+                  {teachers.map((t: any) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Bekor qilish
+              </Button>
+              <Button
+                className="w-full sm:w-auto"
+                onClick={handleCreateOrUpdate}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saqlanyapti...
+                  </>
+                ) : isEditing ? (
+                  'Saqlash'
+                ) : (
+                  "Darsni qo'shish"
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </SlideOver>
 
-      <ConfirmDialog 
-        open={deleteOpen} 
-        onOpenChange={setDeleteOpen} 
-        title="O'chirish" 
-        description="Jadvaldagi ushbu darsni o'chirishga ishonchingiz komilmi?" 
-        confirmText="O'chirish" 
-        variant="destructive" 
-        onConfirm={async () => { await remove(selectedSlot.id); setDeleteOpen(false); }} 
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="O'chirish"
+        description={
+          selectedTimetable && !selectedSlot
+            ? "Ushbu jadvalni va undagi barcha darslarni o'chirishga ishonchingiz komilmi?"
+            : "Jadvaldagi ushbu darsni o'chirishga ishonchingiz komilmi?"
+        }
+        confirmText="O'chirish"
+        variant="destructive"
+        onConfirm={async () => {
+          try {
+            if (selectedTimetable && !selectedSlot) {
+              // Delete timetable
+              await api.delete(`/staff/timetables/${selectedTimetable.id}`);
+              toast.success("Jadval muvaffaqiyatli o'chirildi");
+              await refetchTimetables();
+              if (selectedTimetableId) {
+                await refetchDetails();
+              }
+              setSelectedTimetableId(null);
+            } else if (selectedSlot && selectedTimetable) {
+              // Delete lesson
+              await api.delete(
+                `/staff/timetables/${selectedTimetable.id}/lessons/${selectedSlot.id}`,
+              );
+              toast.success("Dars muvaffaqiyatli o'chirildi");
+              await refetchTimetables();
+              if (selectedTimetableId) {
+                await refetchDetails();
+              }
+            }
+
+            setDeleteOpen(false);
+            setSelectedSlot(null);
+          } catch (error: any) {
+            const message = error?.response?.data?.message || "O'chirishda xatolik yuz berdi";
+            toast.error(message);
+            console.error('Error deleting:', error);
+          }
+        }}
       />
     </div>
   );

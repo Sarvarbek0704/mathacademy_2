@@ -120,7 +120,7 @@ export class SubjectsService {
       ]);
 
       return {
-        items: items.map((s) => ({
+        data: items.map((s) => ({
           id: s.id.toString(),
           name: s.name,
           isCore: s.is_core,

@@ -28,7 +28,7 @@ const navGroups: NavItem[] = [
   {
     label: 'Akademik', icon: BookOpen,
     children: [
-      { label: "O'quv yillari", path: '/staff/academic-years', icon: Calendar, permission: 'academicYears.read' },
+      { label: "O'quv yillari", path: '/staff/academic-years', icon: Calendar, permission: 'academic_years.read' },
       { label: 'Guruhlar', path: '/staff/groups', icon: UsersRound, permission: 'groups.read' },
       { label: "Yo'nalishlar", path: '/staff/tracks', icon: Route, permission: 'tracks.read' },
       { label: 'Kohortalar', path: '/staff/cohorts', icon: Layers, permission: 'cohorts.read' },
@@ -56,7 +56,7 @@ const navGroups: NavItem[] = [
     label: 'Intizom', icon: Shield,
     children: [
       { label: 'Qoidabuzarliklar', path: '/staff/violations', icon: Flag, permission: 'violations.read' },
-      { label: 'Jazolar', path: '/staff/discipline-actions', icon: Scale, permission: 'disciplineActions.read' },
+      { label: 'Jazolar', path: '/staff/discipline-actions', icon: Scale, permission: 'discipline_actions.read' },
     ],
   },
   {
