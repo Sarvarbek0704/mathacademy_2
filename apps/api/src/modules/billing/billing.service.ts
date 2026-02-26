@@ -524,6 +524,45 @@ export class BillingService {
     };
   }
 
+  async listDormMonths(tenantId: string, limit = 20, offset = 0) {
+    const tenant_id = toBigInt(tenantId, 'tenantId');
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.dorm_billing_months.count({
+        where: { tenant_id },
+      }),
+      this.prisma.dorm_billing_months.findMany({
+        where: { tenant_id },
+        orderBy: [{ month_start: 'desc' }],
+        take: Math.min(limit, 200),
+        skip: offset,
+        include: {
+          _count: {
+            select: {
+              dorm_payment_announcements: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      data: items.map((item) => ({
+        id: item.id.toString(),
+        monthKey: item.month_key,
+        monthStart: toISODate(item.month_start),
+        monthEnd: toISODate(item.month_end),
+        createdAt: item.created_at,
+        announcementsCount: item._count.dorm_payment_announcements,
+      })),
+      meta: {
+        total,
+        limit,
+        offset,
+      },
+    };
+  }
+
   async createDormAnnouncement(
     tenantId: string,
     staffUserId: string,

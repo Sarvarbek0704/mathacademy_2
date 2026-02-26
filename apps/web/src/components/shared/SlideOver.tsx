@@ -34,20 +34,12 @@ export function SlideOver({
 }: SlideOverProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className={`overflow-y-auto ${sizeMap[size]}`}>
+      <SheetContent className={`overflow-y-auto overflow-x-visible ${sizeMap[size]}`}>
         <SheetHeader className="mb-6 border-b pb-4">
-          <SheetTitle className="text-xl font-semibold tracking-tight">
-            {title}
-          </SheetTitle>
-          {description && (
-            <SheetDescription className="text-sm">
-              {description}
-            </SheetDescription>
-          )}
+          <SheetTitle className="text-xl font-semibold tracking-tight">{title}</SheetTitle>
+          {description && <SheetDescription className="text-sm">{description}</SheetDescription>}
         </SheetHeader>
-        <div className="flex-1 pb-10">
-          {children}
-        </div>
+        <div className="flex-1 pb-10">{children}</div>
       </SheetContent>
     </Sheet>
   );

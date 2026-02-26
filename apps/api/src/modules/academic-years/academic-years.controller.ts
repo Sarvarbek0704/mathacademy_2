@@ -1,4 +1,4 @@
-// apps/api/src/modules/academic-years/academic-years.controller.ts
+
 import {
   Body,
   Controller,

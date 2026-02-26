@@ -11,13 +11,10 @@ export function rethrowServiceError(e: unknown): never {
   if (e instanceof HttpException) throw e;
 
   if (e instanceof Prisma.PrismaClientKnownRequestError) {
-    // P2025: record not found (update/delete on missing)
     if (e.code === 'P2025') throw new NotFoundException('NOT_FOUND');
 
-    // P2002: unique constraint
     if (e.code === 'P2002') throw new ConflictException('ALREADY_EXISTS');
 
-    // P2003: FK constraint
     if (e.code === 'P2003')
       throw new BadRequestException('FOREIGN_KEY_CONSTRAINT');
 

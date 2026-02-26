@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable, type Column } from '@/components/shared/DataTable';
 import { SlideOver } from '@/components/shared/SlideOver';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -8,16 +8,79 @@ import { useCrud } from '@/hooks/useCrud';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Trash2, Eye } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Pencil, Trash2, Eye, Plus, Loader2, LayoutGrid, LayoutList, Filter } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import api from '@/lib/api';
 
 export default function StudentsPage() {
-  const { data, loading, total, page, totalPages, setSearch, setPage, create, update, remove } = useCrud({ endpoint: '/staff/students' });
+  const navigate = useNavigate();
+  const {
+    data: students,
+    loading,
+    total,
+    page,
+    totalPages,
+    search,
+    setSearch,
+    setPage,
+    create,
+    update,
+    remove,
+  } = useCrud({ endpoint: '/staff/students' });
+
+  const [groups, setGroups] = useState<any[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Fetch groups on mount
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const res = await api.get('/staff/groups');
+        const groupsData = res.data?.data || res.data?.items || [];
+        setGroups(Array.isArray(groupsData) ? groupsData : []);
+      } catch (error) {
+        console.error('Failed to fetch groups:', error);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
+    fetchGroups();
+  }, []);
+
+  // Filter students by selected group
+  const filteredStudents =
+    selectedGroup === 'all'
+      ? students
+      : students.filter(
+          (s: any) =>
+            String(s.groupId || s.group_id) === selectedGroup ||
+            String(s.group?.id) === selectedGroup,
+        );
 
   const initialForm = {
     fullName: '',
@@ -26,37 +89,15 @@ export default function StudentsPage() {
     admissionGrade: '10',
     admissionDate: new Date().toISOString().split('T')[0],
     expectedGraduationYear: new Date().getFullYear() + 2,
+    groupId: '',
     livingTypeCode: 'DAY_ONLY',
     guardianFullName: '',
     guardianPhone: '',
     guardianRelation: 'FATHER',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
   };
 
   const [form, setForm] = useState<any>(initialForm);
-
-  const columns: Column<any>[] = [
-    {
-      key: 'name', title: "O'quvchi",
-      render: (item) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-              {(item.firstName || item.first_name || '?')[0]}{(item.lastName || item.last_name || '?')[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{item.firstName || item.first_name} {item.lastName || item.last_name}</p>
-            <p className="text-xs text-muted-foreground">{item.studentId || item.student_id}</p>
-          </div>
-        </div>
-      ),
-    },
-    { key: 'grade', title: 'Sinf', render: (item) => <span className="font-medium">{item.grade || '-'}</span> },
-    { key: 'group', title: 'Guruh', render: (item) => item.group?.name || item.groupName || '-' },
-    { key: 'status', title: 'Status', render: (item) => <StatusBadge status={item.status || 'ACTIVE'} /> },
-    { key: 'livingType', title: 'Yashash turi', render: (item) => (item.livingType?.name || item.living_type || '-') },
-  ];
 
   const openCreate = () => {
     setEditing(null);
@@ -67,12 +108,17 @@ export default function StudentsPage() {
   const openEdit = (item: any) => {
     setEditing(item);
     setForm({
-      fullName: item.fullName || item.full_name || `${item.firstName || ''} ${item.lastName || ''}`.trim() || '',
+      fullName:
+        item.fullName ||
+        item.full_name ||
+        `${item.firstName || item.first_name || ''} ${item.lastName || item.last_name || ''}`.trim() ||
+        '',
       gender: item.gender || 'MALE',
-      birthDate: item.birthDate ? new Date(item.birthDate).toISOString().split('T')[0] : '',
+      birthDate: item.birthDate || '',
       admissionGrade: String(item.admissionGrade || item.grade || '10'),
-      admissionDate: item.admissionDate ? new Date(item.admissionDate).toISOString().split('T')[0] : '',
-      expectedGraduationYear: item.expectedGraduationYear || (new Date().getFullYear() + 2),
+      admissionDate: item.admissionDate || '',
+      expectedGraduationYear: item.expectedGraduationYear || new Date().getFullYear() + 2,
+      groupId: item.group?.id || item.groupId || '',
       livingTypeCode: item.livingTypeCode || item.living_type_code || 'DAY_ONLY',
       guardianFullName: item.guardianFullName || item.guardian_full_name || '',
       guardianPhone: item.guardianPhone || item.guardian_phone || '',
@@ -83,18 +129,27 @@ export default function StudentsPage() {
   };
 
   const handleSubmit = async () => {
-    const payload = {
-      ...form,
-      admissionGrade: parseInt(form.admissionGrade, 10),
-      expectedGraduationYear: parseInt(form.expectedGraduationYear, 10),
-    };
+    setIsSubmitting(true);
+    try {
+      const payload: any = {
+        ...form,
+        admissionGrade: parseInt(form.admissionGrade, 10),
+        expectedGraduationYear: parseInt(form.expectedGraduationYear, 10),
+      };
 
-    if (editing) {
-      await update(editing.id, payload);
-    } else {
-      await create(payload);
+      if (form.groupId) {
+        payload.groupId = form.groupId;
+      }
+
+      if (editing) {
+        await update(editing.id, payload);
+      } else {
+        await create(payload);
+      }
+      setModalOpen(false);
+    } finally {
+      setIsSubmitting(false);
     }
-    setModalOpen(false);
   };
 
   const handleDelete = async () => {
@@ -105,48 +160,339 @@ export default function StudentsPage() {
     }
   };
 
+  const getLivingTypeLabel = (code: string) => {
+    const map: Record<string, string> = {
+      DAY_ONLY: 'Faqat kunduzgi',
+      WEEKDAYS_ONLY: '5 kunlik yotoqxona',
+      FULL_BOARD: "To'liq yotoqxona (7 kun)",
+    };
+    return map[code] || code;
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="O'quvchilar" description="Barcha o'quvchilar ro'yxati"
-        action={{ label: "Yangi o'quvchi", onClick: openCreate }} />
-
-      <DataTable
-        columns={columns}
-        data={data}
-        loading={loading}
-        searchable
-        searchPlaceholder="Ism, familiya yoki ID bo'yicha qidirish..."
-        onSearch={setSearch}
-        pagination={{ page, totalPages, total, onPageChange: setPage }}
-        actions={(item) => (
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setDeleting(item); setDeleteOpen(true); }}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        )}
+      <PageHeader
+        title="O'quvchilar"
+        description="Barcha o'quvchilar ro'yxati"
+        action={{
+          label: "Yangi o'quvchi",
+          icon: <Plus className="h-4 w-4" />,
+          onClick: openCreate,
+        }}
       />
 
-      <SlideOver open={modalOpen} onOpenChange={setModalOpen}
+      {/* Group Selector & Search Bar & View Toggle */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <Input
+            placeholder="Ism, familiya yoki ID bo'yicha qidirish..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1"
+          />
+          <div className="flex gap-1 border rounded-lg p-1">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              title="Grid ko'rinishi"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              title="Table ko'rinishi"
+            >
+              <LayoutList className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Group Filter */}
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Guruhni tanlang..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Barcha Guruhlar</SelectItem>
+              {groups.map((group: any) => (
+                <SelectItem key={group.id} value={String(group.id)}>
+                  {group.name || group.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">
+            {filteredStudents.length} ta o'quvchi
+          </span>
+        </div>
+      </div>
+
+      {/* Students Grid/Table */}
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
+        </div>
+      ) : students.length === 0 ? (
+        <Card>
+          <CardContent className="flex h-32 items-center justify-center text-muted-foreground">
+            O'quvchilar topilmadi
+          </CardContent>
+        </Card>
+      ) : filteredStudents.length === 0 ? (
+        <Card>
+          <CardContent className="flex h-32 items-center justify-center text-muted-foreground">
+            Tanlangan guruhda o'quvchilar topilmadi
+          </CardContent>
+        </Card>
+      ) : viewMode === 'table' ? (
+        // TABLE VIEW
+        <div className="space-y-4">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>F.I.Sh</TableHead>
+                  <TableHead className="w-32">O'quvchi ID</TableHead>
+                  <TableHead>Guruh</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right w-20">Amallar</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map((student: any, idx: number) => (
+                  <TableRow key={student.id} className="hover:bg-muted/50">
+                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                            {student.firstName?.[0] || student.first_name?.[0] || '?'}
+                            {student.lastName?.[0] || student.last_name?.[0] || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold">
+                            {student.firstName || student.first_name}{' '}
+                            {student.lastName || student.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {student.guardianFullName || student.guardian_full_name || '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm font-mono font-bold text-primary">
+                      {student.studentId || student.student_id || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm">{student.group?.name || '-'}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={student.status || 'ACTIVE'} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/staff/students/${student.id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(student)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDeleting(student);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Jami: {total} ta o'quvchi | {page}/{totalPages}-sahifa
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Oldingi
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                >
+                  Keyingi
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        // GRID VIEW
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredStudents.map((student: any) => (
+              <Card
+                key={student.id}
+                className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                          {student.firstName?.[0] || student.first_name?.[0] || '?'}
+                          {student.lastName?.[0] || student.last_name?.[0] || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm line-clamp-2">
+                          {student.firstName || student.first_name}{' '}
+                          {student.lastName || student.last_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono font-bold">
+                          ID: {student.studentId || student.student_id || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={student.status || 'ACTIVE'} />
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-3">
+                  {/* Info Items */}
+                  <div className="space-y-2 text-sm border-t pt-3">
+                    {student.grade && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sinf:</span>
+                        <Badge variant="outline">{student.grade}-sinf</Badge>
+                      </div>
+                    )}
+                    {student.group?.name && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Guruh:</span>
+                        <span className="font-medium text-xs">{student.group.name}</span>
+                      </div>
+                    )}
+                    {(student.guardianFullName || student.guardian_full_name) && (
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground">Vasiy:</span>
+                        <span className="font-medium text-xs text-right max-w-xs truncate">
+                          {student.guardianFullName || student.guardian_full_name}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => navigate(`/staff/students/${student.id}`)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ko'rish
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(student)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setDeleting(student);
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Jami: {total} ta o'quvchi | {page}/{totalPages}-sahifa
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Oldingi
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                >
+                  Keyingi
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      <SlideOver
+        open={modalOpen}
+        onOpenChange={setModalOpen}
         title={editing ? "O'quvchini tahrirlash" : "Yangi o'quvchi qo'shish"}
-        description="Barcha majburiy maydonlarni to'ldiring" size="lg">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        description="Barcha majburiy maydonlarni to'ldiring"
+        size="lg"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
           <div className="space-y-4">
             <h3 className="text-lg font-medium border-b pb-2">O'quvchi ma'lumotlari</h3>
-            
+
             <div className="space-y-2">
-              <Label>F.I.Sh</Label>
-              <Input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} placeholder="Ism va Familiya" />
+              <Label>F.I.Sh *</Label>
+              <Input
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                placeholder="Ism va Familiya"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Jinsi</Label>
-                <Select value={form.gender} onValueChange={v => setForm({ ...form, gender: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Jinsi *</Label>
+                <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="MALE">Erkak</SelectItem>
                     <SelectItem value="FEMALE">Ayol</SelectItem>
@@ -155,15 +501,23 @@ export default function StudentsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Tug'ilgan sana</Label>
-                <Input type="date" value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} />
+                <DatePicker
+                  value={form.birthDate}
+                  onChange={(date) => setForm({ ...form, birthDate: date })}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Qabul sinfi</Label>
-                <Select value={form.admissionGrade} onValueChange={v => setForm({ ...form, admissionGrade: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Qabul sinfi *</Label>
+                <Select
+                  value={form.admissionGrade}
+                  onValueChange={(v) => setForm({ ...form, admissionGrade: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="8">8-sinf</SelectItem>
                     <SelectItem value="9">9-sinf</SelectItem>
@@ -173,20 +527,48 @@ export default function StudentsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Bitiruv yili</Label>
-                <Input type="number" value={form.expectedGraduationYear} onChange={e => setForm({ ...form, expectedGraduationYear: e.target.value })} />
+                <Label>Bitiruv yili *</Label>
+                <Input
+                  type="number"
+                  value={form.expectedGraduationYear}
+                  onChange={(e) => setForm({ ...form, expectedGraduationYear: e.target.value })}
+                />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Guruh</Label>
+              <Select value={form.groupId} onValueChange={(v) => setForm({ ...form, groupId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Guruhni tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((group: any) => (
+                    <SelectItem key={group.id} value={String(group.id)}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Qabul sanasi</Label>
-                <Input type="date" value={form.admissionDate} onChange={e => setForm({ ...form, admissionDate: e.target.value })} />
+                <Label>Qabul sanasi *</Label>
+                <DatePicker
+                  value={form.admissionDate}
+                  onChange={(date) => setForm({ ...form, admissionDate: date })}
+                />
               </div>
               <div className="space-y-2">
-                <Label>Yashash turi</Label>
-                <Select value={form.livingTypeCode} onValueChange={v => setForm({ ...form, livingTypeCode: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Yashash turi *</Label>
+                <Select
+                  value={form.livingTypeCode}
+                  onValueChange={(v) => setForm({ ...form, livingTypeCode: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DAY_ONLY">Faqat kunduzgi</SelectItem>
                     <SelectItem value="WEEKDAYS_ONLY">5 kunlik yotoqxona</SelectItem>
@@ -199,8 +581,10 @@ export default function StudentsPage() {
             {editing && (
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ACTIVE">Faol</SelectItem>
                     <SelectItem value="GRADUATED">Bitirgan</SelectItem>
@@ -214,11 +598,16 @@ export default function StudentsPage() {
 
           <div className="space-y-4">
             <h3 className="text-lg font-medium border-b pb-2">Ota-ona ma'lumotlari</h3>
-            
+
             <div className="space-y-2">
-              <Label>Aloqadorligi</Label>
-              <Select value={form.guardianRelation} onValueChange={v => setForm({ ...form, guardianRelation: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>Aloqadorligi *</Label>
+              <Select
+                value={form.guardianRelation}
+                onValueChange={(v) => setForm({ ...form, guardianRelation: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="FATHER">Ota</SelectItem>
                   <SelectItem value="MOTHER">Ona</SelectItem>
@@ -229,26 +618,51 @@ export default function StudentsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Ota-ona (Vasiy) F.I.Sh</Label>
-              <Input value={form.guardianFullName} onChange={e => setForm({ ...form, guardianFullName: e.target.value })} placeholder="Vasiyning ism-familiyasi" />
+              <Label>Ota-ona (Vasiy) F.I.Sh *</Label>
+              <Input
+                value={form.guardianFullName}
+                onChange={(e) => setForm({ ...form, guardianFullName: e.target.value })}
+                placeholder="Vasiyning ism-familiyasi"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Telefon raqami</Label>
-              <Input value={form.guardianPhone} onChange={e => setForm({ ...form, guardianPhone: e.target.value })} placeholder="+998901234567" />
+              <Input
+                value={form.guardianPhone}
+                onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })}
+                placeholder="+998901234567"
+              />
             </div>
           </div>
         </div>
-        
-        <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row">
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setModalOpen(false)}>Bekor qilish</Button>
-          <Button className="w-full sm:w-auto" onClick={handleSubmit}>{editing ? 'Saqlash' : 'Yaratish'}</Button>
+
+        <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => setModalOpen(false)}
+            disabled={isSubmitting}
+          >
+            Bekor qilish
+          </Button>
+          <Button className="w-full sm:w-auto" onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editing ? 'Saqlash' : 'Yaratish'}
+          </Button>
         </div>
       </SlideOver>
 
-      <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen}
-        title="O'quvchini o'chirish" description={`"${deleting?.firstName || ''} ${deleting?.lastName || ''}" ni o'chirishga ishonchingiz komilmi?`}
-        confirmText="O'chirish" variant="destructive" onConfirm={handleDelete} />
+      {/* Delete Dialog */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="O'quvchini o'chirish"
+        description={`"${deleting?.firstName || deleting?.first_name || ''} ${deleting?.lastName || deleting?.last_name || ''}" ni va barcha bog'langan ma'lumotlarni o'chirishga ishonchingiz komilmi?`}
+        confirmText="O'chirish"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

@@ -53,10 +53,6 @@ export class AssessmentsService {
         select: {
           id: true,
           academic_year_id: true,
-          group_subjects: {
-            where: { subject_id },
-            select: { subject_id: true },
-          },
         },
       });
 
@@ -64,12 +60,7 @@ export class AssessmentsService {
         throw new NotFoundException('GROUP_NOT_FOUND');
       }
 
-      // 2. Check if group studies this subject
-      if (!group.group_subjects.length) {
-        throw new BadRequestException('GROUP_DOES_NOT_STUDY_SUBJECT');
-      }
-
-      // 3. Subject exists and belongs to tenant
+      // 2. Subject exists and belongs to tenant
       const subject = await tx.subjects.findFirst({
         where: {
           id: subject_id,

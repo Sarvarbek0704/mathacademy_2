@@ -69,7 +69,7 @@ export class StudentsController {
       tenantId: String(req.user?.tenantId || ''),
       q: query.q,
       campusId: query.campusId,
-      groupId: query.groupId,
+      groupId: query.groupId || query.currentGroupId,
       trackName: query.trackName,
       status: query.status,
       livingType: query.livingType,
@@ -428,6 +428,125 @@ export class StudentsController {
       },
       changedByUserId: String(req.user?.userId || ''),
       ipAddress: req.ip,
+    });
+  }
+
+  // ==================== GET STUDENT STATS ====================
+  @RequirePermissions('students.read')
+  @Get(':id/stats')
+  @ApiOperation({
+    summary: 'Get student statistics',
+    description:
+      'Get student statistics including grades, attendance, ranking, awards, and pending payments',
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Student statistics returned successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student not found',
+  })
+  getStats(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.studentsService.getStudentStats({
+      tenantId: String(req.user?.tenantId || ''),
+      studentId: id.toString(),
+    });
+  }
+
+  // ==================== GET STUDENT ATTENDANCE ====================
+  @RequirePermissions('students.read')
+  @Get(':id/attendance')
+  @ApiOperation({
+    summary: 'Get student attendance data',
+    description:
+      'Get student attendance including present days, absent days, late days and percentage',
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Student attendance data returned successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student not found',
+  })
+  getAttendance(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.studentsService.getStudentAttendance({
+      tenantId: String(req.user?.tenantId || ''),
+      studentId: id.toString(),
+    });
+  }
+
+  // ==================== GET STUDENT PAYMENTS ====================
+  @RequirePermissions('students.read')
+  @Get(':id/payments')
+  @ApiOperation({
+    summary: 'Get student payments history',
+    description: 'Get list of student payments with amounts, dates and status',
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Student payments history returned successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student not found',
+  })
+  getPayments(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.studentsService.getStudentPayments({
+      tenantId: String(req.user?.tenantId || ''),
+      studentId: id.toString(),
+    });
+  }
+
+  // ==================== GET STUDENT VIOLATIONS ====================
+  @RequirePermissions('students.read')
+  @Get(':id/violations')
+  @ApiOperation({
+    summary: 'Get student discipline violations',
+    description:
+      'Get list of student discipline violations with severity and dates',
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Student violations returned successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student not found',
+  })
+  getViolations(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.studentsService.getStudentViolations({
+      tenantId: String(req.user?.tenantId || ''),
+      studentId: id.toString(),
+    });
+  }
+
+  // ==================== GET STUDENT ASSESSMENTS ====================
+  @RequirePermissions('students.read')
+  @Get(':id/assessments')
+  @ApiOperation({
+    summary: 'Get student assessments and grades',
+    description:
+      'Get list of student assessments grouped by subject with scores and averages',
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Student assessments returned successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Student not found',
+  })
+  getAssessments(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.studentsService.getStudentAssessments({
+      tenantId: String(req.user?.tenantId || ''),
+      studentId: id.toString(),
     });
   }
 }

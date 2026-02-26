@@ -1,6 +1,11 @@
 import { ReactNode, useState } from 'react';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,10 +37,18 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T extends Record<string, any>>({
-  columns, data, loading, searchable, searchPlaceholder = "Qidirish...",
-  onSearch, pagination, emptyMessage = "Ma'lumot topilmadi", actions,
+  columns,
+  data,
+  loading,
+  searchable,
+  searchPlaceholder = 'Qidirish...',
+  onSearch,
+  pagination,
+  emptyMessage = "Ma'lumot topilmadi",
+  actions,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('');
+  const rows = Array.isArray(data) ? data : [];
 
   const handleSearch = (val: string) => {
     setSearch(val);
@@ -50,7 +63,7 @@ export function DataTable<T extends Record<string, any>>({
           <Input
             placeholder={searchPlaceholder}
             value={search}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -60,8 +73,8 @@ export function DataTable<T extends Record<string, any>>({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              {columns.map(col => (
-                <TableHead key={col.key} className={cn("font-semibold", col.className)}>
+              {columns.map((col) => (
+                <TableHead key={col.key} className={cn('font-semibold', col.className)}>
                   {col.title}
                 </TableHead>
               ))}
@@ -71,20 +84,26 @@ export function DataTable<T extends Record<string, any>>({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-32 text-center">
+                <TableCell
+                  colSpan={columns.length + (actions ? 1 : 0)}
+                  className="h-32 text-center"
+                >
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-32 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length + (actions ? 1 : 0)}
+                  className="h-32 text-center text-muted-foreground"
+                >
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item, i) => (
+              rows.map((item, i) => (
                 <TableRow key={item.id || i} className="transition-colors">
-                  {columns.map(col => (
+                  {columns.map((col) => (
                     <TableCell key={col.key} className={col.className}>
                       {col.render ? col.render(item) : item[col.key]}
                     </TableCell>
@@ -99,19 +118,25 @@ export function DataTable<T extends Record<string, any>>({
 
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Jami: {pagination.total} ta
-          </p>
+          <p className="text-sm text-muted-foreground">Jami: {pagination.total} ta</p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={pagination.page <= 1}
-              onClick={() => pagination.onPageChange(pagination.page - 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => pagination.onPageChange(pagination.page - 1)}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium px-2">
               {pagination.page} / {pagination.totalPages}
             </span>
-            <Button variant="outline" size="sm" disabled={pagination.page >= pagination.totalPages}
-              onClick={() => pagination.onPageChange(pagination.page + 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => pagination.onPageChange(pagination.page + 1)}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

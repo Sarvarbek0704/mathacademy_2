@@ -7,14 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Trash2, 
-  Edit2, 
-  Plus, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Trash2,
+  Edit2,
+  Plus,
   Search,
   Filter,
   Trophy,
@@ -22,61 +28,110 @@ import {
   School,
   Loader2,
   Clock,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+  CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 
 export default function EventsPage() {
-  const { data, loading, setSearch, create, remove, update } = useCrud({ endpoint: '/staff/events' });
+  const { data, loading, setSearch, create, remove, update } = useCrud({
+    endpoint: '/staff/events',
+  });
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [form, setForm] = useState({ 
-    title: '', 
-    type: 'EVENT', 
-    date: '', 
-    description: '', 
-    location: '' 
+  const [form, setForm] = useState({
+    title: '',
+    type: 'OTHER',
+    date: '',
+    description: '',
+    location: '',
   });
 
-  const eventTypes: Record<string, { label: string, color: string, icon: any }> = {
-    EVENT: { label: 'Tadbir', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', icon: Calendar },
-    COMPETITION: { label: 'Musobaqa', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Trophy },
-    HOLIDAY: { label: 'Bayram', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: Megaphone },
-    MEETING: { label: 'Yig\'ilish', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', icon: Users },
-    OTHER: { label: 'Boshqa', color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400', icon: School },
+  const eventTypes: Record<string, { label: string; color: string; icon: any }> = {
+    MOVIE_TIME: {
+      label: 'Tadbir',
+      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      icon: Calendar,
+    },
+    TOURNAMENT: {
+      label: 'Musobaqa',
+      color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      icon: Trophy,
+    },
+    MEETING: {
+      label: "Yig'ilish",
+      color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      icon: Users,
+    },
+    OTHER: {
+      label: 'Boshqa',
+      color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400',
+      icon: School,
+    },
   };
 
   const handleCreateOrUpdate = async () => {
+    if (!form.title.trim()) {
+      toast.error('Tadbir nomini kiriting');
+      return;
+    }
+
+    const parsedDate = new Date(form.date);
+    if (!form.date || Number.isNaN(parsedDate.getTime())) {
+      toast.error('Sana va vaqt noto‘g‘ri kiritilgan');
+      return;
+    }
+
+    const payload = {
+      title: form.title.trim(),
+      eventType: form.type,
+      startsAt: parsedDate.toISOString(),
+      description: form.description?.trim() || undefined,
+    };
+
     if (isEditing) {
-      await update(selectedEvent.id, form);
+      await update(selectedEvent.id, payload);
     } else {
-      await create(form);
+      await create(payload);
     }
     setModalOpen(false);
     setIsEditing(false);
   };
 
   const openCreate = () => {
-    setForm({ title: '', type: 'EVENT', date: dayjs().format('YYYY-MM-DDTHH:mm'), description: '', location: '' });
+    setForm({
+      title: '',
+      type: 'OTHER',
+      date: dayjs().format('YYYY-MM-DDTHH:mm'),
+      description: '',
+      location: '',
+    });
     setIsEditing(false);
     setModalOpen(true);
   };
 
   const openEdit = (event: any) => {
     setSelectedEvent(event);
-    setForm({ 
-      title: event.title, 
-      type: event.type || 'EVENT', 
-      date: dayjs(event.date).format('YYYY-MM-DDTHH:mm'), 
-      description: event.description || '', 
-      location: event.location || '' 
+    setForm({
+      title: event.title,
+      type: event.eventType || event.type || 'OTHER',
+      date: dayjs(event.startsAt || event.date).format('YYYY-MM-DDTHH:mm'),
+      description: event.description || '',
+      location: event.campusName || event.location || '',
     });
     setIsEditing(true);
     setModalOpen(true);
@@ -84,24 +139,27 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Tadbirlar boshqaruvi" 
-        description="Akademiya tadbirlari, bayramlar va yig'ilishlarni rejalashtirish" 
-        action={{ 
-          label: "Tadbir qo'shish", 
+      <PageHeader
+        title="Tadbirlar boshqaruvi"
+        description="Akademiya tadbirlari, bayramlar va yig'ilishlarni rejalashtirish"
+        action={{
+          label: "Tadbir qo'shish",
           icon: <Plus className="h-4 w-4" />,
-          onClick: openCreate
-        }} 
+          onClick: openCreate,
+        }}
       />
 
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card p-4 rounded-xl border">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Tadbirlardan qidirish..." 
-            className="pl-10 h-10" 
-            value={searchTerm} 
-            onChange={e => { setSearchTerm(e.target.value); setSearch(e.target.value); }} 
+          <Input
+            placeholder="Tadbirlardan qidirish..."
+            className="pl-10 h-10"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setSearch(e.target.value);
+            }}
           />
         </div>
       </div>
@@ -113,20 +171,44 @@ export default function EventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.map((event: any) => {
-            const typeInfo = eventTypes[event.type] || eventTypes.OTHER;
+            const eventType = event.eventType || event.type;
+            const eventDate = event.startsAt || event.date;
+            const typeInfo = eventTypes[eventType] || eventTypes.OTHER;
             const Icon = typeInfo.icon;
             return (
-              <Card key={event.id} className="group hover:border-primary/50 transition-all flex flex-col h-full overflow-hidden">
+              <Card
+                key={event.id}
+                className="group hover:border-primary/50 transition-all flex flex-col h-full overflow-hidden"
+              >
                 <CardHeader className="p-5 pb-2">
                   <div className="flex justify-between items-start mb-2">
-                    <Badge className={cn("px-2 py-0 h-5 text-[10px] font-bold border-none", typeInfo.color)} variant="outline">
+                    <Badge
+                      className={cn(
+                        'px-2 py-0 h-5 text-[10px] font-bold border-none',
+                        typeInfo.color,
+                      )}
+                      variant="outline"
+                    >
                       {typeInfo.label}
                     </Badge>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(event)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => openEdit(event)}
+                      >
                         <Edit2 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => { setSelectedEvent(event); setDeleteOpen(true); }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setDeleteOpen(true);
+                        }}
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -137,15 +219,15 @@ export default function EventsPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Calendar className="h-3.5 w-3.5 text-primary" />
-                      {dayjs(event.date).format('DD.MM.YYYY')}
+                      {dayjs(eventDate).format('DD.MM.YYYY')}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock className="h-3.5 w-3.5 text-primary" />
-                      {dayjs(event.date).format('HH:mm')}
+                      {dayjs(eventDate).format('HH:mm')}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 text-primary" />
-                      {event.location || 'Joylashuv belgilanmagan'}
+                      {event.campusName || event.location || 'Joylashuv belgilanmagan'}
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
@@ -164,20 +246,33 @@ export default function EventsPage() {
       )}
 
       {/* Form SlideOver */}
-      <SlideOver open={modalOpen} onOpenChange={setModalOpen} title={isEditing ? "Tadbirni tahrirlash" : "Yangi tadbir qo'shish"} size="sm">
+      <SlideOver
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={isEditing ? 'Tadbirni tahrirlash' : "Yangi tadbir qo'shish"}
+        size="sm"
+      >
         <div className="space-y-6">
           <div className="space-y-2">
             <Label>Tadbir nomi</Label>
-            <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Masalan: Navro'z bayrami" />
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Masalan: Navro'z bayrami"
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Turi</Label>
-            <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {Object.entries(eventTypes).map(([val, info]) => (
-                  <SelectItem key={val} value={val}>{info.label}</SelectItem>
+                  <SelectItem key={val} value={val}>
+                    {info.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -185,21 +280,40 @@ export default function EventsPage() {
 
           <div className="space-y-2">
             <Label>Sana va vaqt</Label>
-            <Input type="datetime-local" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+            <Input
+              type="datetime-local"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Manzil / Joy</Label>
-            <Input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Masalan: Asosiy zal" />
+            <Input
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="Masalan: Asosiy zal"
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Tavsif</Label>
-            <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tadbir haqida batafsil..." rows={4} />
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Tadbir haqida batafsil..."
+              rows={4}
+            />
           </div>
 
           <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setModalOpen(false)}>Bekor qilish</Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setModalOpen(false)}
+            >
+              Bekor qilish
+            </Button>
             <Button className="w-full sm:w-auto" onClick={handleCreateOrUpdate}>
               {isEditing ? 'Saqlash' : 'Yaratish'}
             </Button>
@@ -207,14 +321,17 @@ export default function EventsPage() {
         </div>
       </SlideOver>
 
-      <ConfirmDialog 
-        open={deleteOpen} 
-        onOpenChange={setDeleteOpen} 
-        title="Tadbirni o'chirish" 
-        description="Ushbu tadbirni o'chirishga ishonchingiz komilmi? Bu amalni ortga qaytarib bo'lmaydi." 
-        confirmText="O'chirish" 
-        variant="destructive" 
-        onConfirm={async () => { await remove(selectedEvent.id); setDeleteOpen(false); }} 
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Tadbirni o'chirish"
+        description="Ushbu tadbirni o'chirishga ishonchingiz komilmi? Bu amalni ortga qaytarib bo'lmaydi."
+        confirmText="O'chirish"
+        variant="destructive"
+        onConfirm={async () => {
+          await remove(selectedEvent.id);
+          setDeleteOpen(false);
+        }}
       />
     </div>
   );

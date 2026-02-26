@@ -22,7 +22,6 @@ export default function RankingPage() {
   const [dateTo, setDateTo] = useState<string>(new Date().toISOString().split('T')[0]);
   const [viewingSnapshot, setViewingSnapshot] = useState<any>(null);
 
-  // Fetch Groups for selector
   const { data: groupsRes } = useQuery({
     queryKey: ['staff', 'groups', 'list'],
     queryFn: async () => (await api.get('/staff/groups?limit=100')).data,

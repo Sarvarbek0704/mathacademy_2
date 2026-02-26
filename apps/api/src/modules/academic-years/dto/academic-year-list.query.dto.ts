@@ -1,4 +1,4 @@
-// apps/api/src/modules/academic-years/dto/academic-year-list.query.dto.ts
+
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

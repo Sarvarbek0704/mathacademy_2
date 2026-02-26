@@ -33,6 +33,14 @@ export class StudentListQuery {
   groupId?: string;
 
   @ApiPropertyOptional({
+    example: '1',
+    description: 'Legacy alias for groupId (backward compatibility)',
+  })
+  @IsOptional()
+  @Type(() => String)
+  currentGroupId?: string;
+
+  @ApiPropertyOptional({
     example: 'Physics',
     description: 'Filter by track name',
   })

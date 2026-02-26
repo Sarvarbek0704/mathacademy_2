@@ -1,4 +1,4 @@
-// apps/api/src/common/utils/audit.util.ts
+
 import { PrismaService } from '../../prisma/prisma.service';
 
 type AuditAction =
@@ -61,12 +61,10 @@ export class AuditLogger {
         },
       });
     } catch (error) {
-      // Audit log xatosi asosiy operatsiyani buzmasin
       console.error('Audit logging failed:', error);
     }
   }
 
-  // Convenience methods
   async logStaffAction(
     tenantId: bigint,
     userId: bigint,

@@ -133,6 +133,23 @@ export class StaffBillingController {
     return this.service.createDormMonth(this.tenantId(req), dto);
   }
 
+  @Get('dorm/months')
+  @RequirePermissions('billing.read')
+  @ApiOperation({ summary: 'List dorm billing months' })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({ name: 'offset', required: false, example: 0 })
+  listDormMonths(
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.listDormMonths(
+      this.tenantId(req),
+      limit ? parseInt(limit, 10) : 20,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
   @Post('dorm/announcements')
   @RequirePermissions('billing.write')
   @ApiOperation({ summary: 'Create dorm payment announcement' })

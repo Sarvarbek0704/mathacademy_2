@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Req,
@@ -14,13 +15,11 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiQuery,
 } from '@nestjs/swagger';
 
 import { PermissionsGuard } from '../../common/guards/perms.guard';
 import { RequirePermissions } from '../../common/decorators/perms.decorator';
 import { AccessGuard } from '../../common/guards/access.guard';
-import { ParseBigIntPipe } from '../../common/pipes/parse-bigint.pipe';
 
 import { RiskService } from './risk.service';
 import { SetRiskDto } from './dto/set-risk.dto';
@@ -76,7 +75,7 @@ export class RiskController {
   @ApiOperation({
     summary: 'Get latest risk scores for all students in a group',
   })
-  latestByGroup(@Req() req: any, @Query('groupId') groupId: string) {
+  latestByGroup(@Req() req: any, @Param('groupId') groupId: string) {
     // We'll handle validation in service
     return this.svc.latestByGroup({
       tenantId: this.tenantId(req),
@@ -87,7 +86,7 @@ export class RiskController {
   @Get('latest/student/:studentId')
   @RequirePermissions('risk.read')
   @ApiOperation({ summary: 'Get latest risk score for a specific student' })
-  latestByStudent(@Req() req: any, @Query('studentId') studentId: string) {
+  latestByStudent(@Req() req: any, @Param('studentId') studentId: string) {
     return this.svc.latestByStudent({
       tenantId: this.tenantId(req),
       studentId,

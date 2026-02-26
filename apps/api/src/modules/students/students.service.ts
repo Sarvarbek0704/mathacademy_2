@@ -184,12 +184,19 @@ export class StudentsService {
       return {
         data: rows.map((r) => ({
           id: r.id.toString(),
+          studentId: r.student_accounts?.student_login_id || '',
           fullName: r.full_name,
+          firstName: r.full_name?.split(' ')[0] || '',
+          lastName: r.full_name?.split(' ').slice(1).join(' ') || '',
           status: r.status,
           gender: r.gender,
-          birthDate: r.birth_date,
+          birthDate: r.birth_date
+            ? new Date(r.birth_date).toISOString().split('T')[0]
+            : '',
           admissionGrade: r.admission_grade,
-          admissionDate: r.admission_date,
+          admissionDate: r.admission_date
+            ? new Date(r.admission_date).toISOString().split('T')[0]
+            : '',
           expectedGraduationYear: r.expected_graduation_year,
           createdAt: r.created_at,
           archivedAt: r.archived_at,
@@ -658,6 +665,15 @@ export class StudentsService {
       return {
         ...student,
         id: student.id.toString(),
+        studentId: student.student_accounts?.student_login_id || '',
+        firstName: student.full_name?.split(' ')[0] || '',
+        lastName: student.full_name?.split(' ').slice(1).join(' ') || '',
+        birthDate: student.birth_date
+          ? new Date(student.birth_date).toISOString().split('T')[0]
+          : '',
+        admissionDate: student.admission_date
+          ? new Date(student.admission_date).toISOString().split('T')[0]
+          : '',
         groupHistory: groupHistory.map((h) => ({
           id: h.id.toString(),
           groupId: h.group_id.toString(),
@@ -848,7 +864,21 @@ export class StudentsService {
         }
 
         // Update living type (handle through separate endpoint)
-        // Group assignment (handle through separate endpoint)
+        // Update group
+        if (args.dto.groupId !== undefined) {
+          if (args.dto.groupId) {
+            const group = await tx.groups.findFirst({
+              where: {
+                id: toBigInt(args.dto.groupId, 'groupId'),
+                tenant_id,
+              },
+            });
+            if (!group) throw new BadRequestException('GROUP_NOT_FOUND');
+            updateData.current_group_id = group.id;
+          } else {
+            updateData.current_group_id = null;
+          }
+        }
 
         // Update student
         const updatedStudent = await tx.students.update({
@@ -1806,5 +1836,240 @@ export class StudentsService {
     return Object.entries(dailyCounts)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // ==================== GET STUDENT STATS ====================
+  async getStudentStats(args: { tenantId: string; studentId: string }) {
+    const tenant_id = toBigInt(args.tenantId, 'tenantId');
+    const student_id = toBigInt(args.studentId, 'studentId');
+
+    const student = await this.prisma.students.findUnique({
+      where: { id: student_id, tenant_id },
+    });
+    if (!student) throw new NotFoundException('STUDENT_NOT_FOUND');
+
+    // Get average grade from assessment_scores
+    const assessmentScores = await this.prisma.assessment_scores.findMany({
+      where: { student_id },
+      select: { score: true },
+    });
+    const averageGrade =
+      assessmentScores.length > 0
+        ? assessmentScores.reduce((sum, a) => sum + Number(a.score), 0) /
+          assessmentScores.length
+        : 0;
+
+    // Get total tests
+    const totalTests = assessmentScores.length;
+
+    // Get attendance percentage from attendance_marks
+    const attendanceMarks = await this.prisma.attendance_marks.groupBy({
+      by: ['status'],
+      where: { student_id },
+      _count: { student_id: true },
+    });
+    const totalAttendance = attendanceMarks.reduce(
+      (sum, a) => sum + a._count.student_id,
+      0,
+    );
+    const presentDays =
+      attendanceMarks.find((a) => a.status === 'PRESENT')?._count.student_id ||
+      0;
+    const attendancePercentage =
+      totalAttendance > 0 ? (presentDays / totalAttendance) * 100 : 0;
+
+    // Get group ranking
+    const groupRank = 1; // TODO: Implement ranking logic with raw SQL if needed
+
+    // Get group size
+    const groupSize = await this.prisma.students.count({
+      where: { current_group_id: student.current_group_id, tenant_id },
+    });
+
+    // Get total awards through award_recipients
+    const awardsCount = await this.prisma.award_recipients.count({
+      where: { student_id },
+    });
+
+    // Get pending payments through invoices
+    const pendingInvoices = await this.prisma.invoices.findMany({
+      where: { student_id, status: 'PENDING', tenant_id },
+      select: { amount: true },
+    });
+    const totalPending = pendingInvoices.reduce(
+      (sum, inv) => sum + Number(inv.amount),
+      0,
+    );
+
+    return {
+      averageGrade: parseFloat(averageGrade.toFixed(2)),
+      totalTests,
+      attendancePercentage: parseFloat(attendancePercentage.toFixed(2)),
+      totalClasses: totalAttendance,
+      groupRank,
+      groupSize,
+      awards: awardsCount,
+      pendingPayments: totalPending,
+    };
+  }
+
+  // ==================== GET STUDENT ATTENDANCE ====================
+  async getStudentAttendance(args: { tenantId: string; studentId: string }) {
+    const tenant_id = toBigInt(args.tenantId, 'tenantId');
+    const student_id = toBigInt(args.studentId, 'studentId');
+
+    const student = await this.prisma.students.findUnique({
+      where: { id: student_id, tenant_id },
+    });
+    if (!student) throw new NotFoundException('STUDENT_NOT_FOUND');
+
+    const attendance = await this.prisma.attendance_marks.groupBy({
+      by: ['status'],
+      where: { student_id },
+      _count: { student_id: true },
+    });
+
+    const total = attendance.reduce((sum, a) => sum + a._count.student_id, 0);
+    const present =
+      attendance.find((a) => a.status === 'PRESENT')?._count.student_id || 0;
+    const absent =
+      attendance.find((a) => a.status === 'ABSENT')?._count.student_id || 0;
+    const late =
+      attendance.find((a) => a.status === 'LATE')?._count.student_id || 0;
+
+    return {
+      presentDays: present,
+      absentDays: absent,
+      lateDays: late,
+      totalClasses: total,
+      percentageAttended:
+        total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : 0,
+    };
+  }
+
+  // ==================== GET STUDENT PAYMENTS ====================
+  async getStudentPayments(args: { tenantId: string; studentId: string }) {
+    const tenant_id = toBigInt(args.tenantId, 'tenantId');
+    const student_id = toBigInt(args.studentId, 'studentId');
+
+    const student = await this.prisma.students.findUnique({
+      where: { id: student_id, tenant_id },
+    });
+    if (!student) throw new NotFoundException('STUDENT_NOT_FOUND');
+
+    // Get payments through invoices
+    const invoices = await this.prisma.invoices.findMany({
+      where: { student_id, tenant_id },
+      select: { id: true, amount: true, status: true, created_at: true },
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Get related payments for each invoice
+    const payments = await this.prisma.payments.findMany({
+      where: {
+        invoices: { student_id, tenant_id },
+      },
+      select: {
+        id: true,
+        paid_amount: true,
+        paid_at: true,
+        invoices: { select: { status: true } },
+      },
+      orderBy: { paid_at: 'desc' },
+    });
+
+    return payments.map((p) => ({
+      id: p.id.toString(),
+      amount: parseFloat(p.paid_amount.toString()),
+      status: p.invoices.status,
+      description: '',
+      createdAt: p.paid_at,
+    }));
+  }
+
+  // ==================== GET STUDENT VIOLATIONS ====================
+  async getStudentViolations(args: { tenantId: string; studentId: string }) {
+    const tenant_id = toBigInt(args.tenantId, 'tenantId');
+    const student_id = toBigInt(args.studentId, 'studentId');
+
+    const student = await this.prisma.students.findUnique({
+      where: { id: student_id, tenant_id },
+    });
+    if (!student) throw new NotFoundException('STUDENT_NOT_FOUND');
+
+    const violations = await this.prisma.violations.findMany({
+      where: { student_id, tenant_id },
+      select: {
+        id: true,
+        description: true,
+        severity: true,
+        detected_at: true,
+      },
+      orderBy: { detected_at: 'desc' },
+    });
+
+    return violations.map((v) => ({
+      id: v.id.toString(),
+      description: v.description,
+      severity: v.severity || 'LOW',
+      date: v.detected_at,
+      createdAt: v.detected_at,
+    }));
+  }
+
+  // ==================== GET STUDENT ASSESSMENTS ====================
+  async getStudentAssessments(args: { tenantId: string; studentId: string }) {
+    const tenant_id = toBigInt(args.tenantId, 'tenantId');
+    const student_id = toBigInt(args.studentId, 'studentId');
+
+    const student = await this.prisma.students.findUnique({
+      where: { id: student_id, tenant_id },
+    });
+    if (!student) throw new NotFoundException('STUDENT_NOT_FOUND');
+
+    // Get assessment scores with subject info
+    const assessmentScores = await this.prisma.assessment_scores.findMany({
+      where: { student_id },
+      select: {
+        assessment_id: true,
+        score: true,
+        assessments: {
+          select: {
+            id: true,
+            created_at: true,
+            subjects: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { assessments: { created_at: 'desc' } },
+    });
+
+    // Group by subject
+    const subjectResults: Record<string, { score: number; count: number }> = {};
+    assessmentScores.forEach((a) => {
+      const subject = a.assessments.subjects.name || 'Unknown';
+      if (!subjectResults[subject]) {
+        subjectResults[subject] = { score: 0, count: 0 };
+      }
+      subjectResults[subject].score += Number(a.score);
+      subjectResults[subject].count++;
+    });
+
+    // Calculate averages
+    const subjectGrades: Record<string, number> = {};
+    Object.entries(subjectResults).forEach(([subject, data]) => {
+      subjectGrades[subject] = parseFloat((data.score / data.count).toFixed(2));
+    });
+
+    return {
+      totalAssessments: assessmentScores.length,
+      subjectResults: subjectGrades,
+      allAssessments: assessmentScores.map((a) => ({
+        id: a.assessment_id.toString(),
+        subject: a.assessments.subjects.name,
+        score: parseFloat(a.score.toString()),
+        createdAt: a.assessments.created_at,
+      })),
+    };
   }
 }

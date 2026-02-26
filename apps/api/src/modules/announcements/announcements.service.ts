@@ -213,7 +213,6 @@ export class AnnouncementsService {
       });
       if (!announcement) throw new NotFoundException('ANNOUNCEMENT_NOT_FOUND');
 
-      // Handle publishing logic if isPublished changed
       let published_at = announcement.published_at;
       if (
         args.dto.isPublished !== undefined &&
@@ -398,7 +397,6 @@ export class AnnouncementsService {
     }
   }
 
-  // Guardian methods
 
   async listForGuardian(args: {
     tenantId: string;

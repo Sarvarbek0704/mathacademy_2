@@ -1,4 +1,3 @@
-// src/main.ts - to'g'rilangan
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -28,6 +27,18 @@ function parseOrigins(v?: string): string[] {
     .filter(Boolean);
 }
 
+function isLocalDevOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function bootstrap() {
   patchBigIntJson();
 
@@ -35,7 +46,6 @@ async function bootstrap() {
   const globalPrefix = 'api';
   const port = Number(process.env.PORT) || 4000;
 
-  // Serve uploaded files (local storage)
   const uploadDir = resolve(process.env.UPLOAD_DIR || 'uploads');
   if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
   app.use(
@@ -50,18 +60,32 @@ async function bootstrap() {
   app.setGlobalPrefix(globalPrefix);
   app.use(cookieParser());
 
-  // OSON YECHIM: process.env dan bevosita olamiz
   const frontendPort = Number(process.env.WEB_PORT) || 3000;
   const allowList = [
     `http://localhost:${frontendPort}`,
     `http://127.0.0.1:${frontendPort}`,
-    `http://localhost:${port}`, // Swagger uchun
+    `http://localhost:${port}`,
     `http://127.0.0.1:${port}`,
     ...parseOrigins(process.env.WEB_ORIGINS),
   ];
 
+  const allowSet = new Set(allowList);
+  const isProduction = process.env.NODE_ENV === 'production';
+
   app.enableCors({
-    origin: allowList,
+    origin: (origin, callback) => {
+      // Non-browser clients (curl/postman/server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Explicitly allowed origins from env/defaults
+      if (allowSet.has(origin)) return callback(null, true);
+
+      // Development convenience: allow localhost/127.0.0.1 with any port
+      if (!isProduction && isLocalDevOrigin(origin))
+        return callback(null, true);
+
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -75,7 +99,7 @@ async function bootstrap() {
       },
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false, // qo‘shimcha maydonlarga ruxsat
+      forbidNonWhitelisted: false,
       forbidUnknownValues: false,
       validationError: { target: false, value: false },
       transformOptions: { enableImplicitConversion: true },

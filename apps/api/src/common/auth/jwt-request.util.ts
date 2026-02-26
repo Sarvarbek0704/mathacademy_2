@@ -28,7 +28,6 @@ function extractAccessToken(req: Request): string {
   const bearer = extractBearer(req);
   if (bearer) return bearer;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cookies = (req as any).cookies || {};
   const cookieToken = String(cookies.access_token || '').trim();
   if (cookieToken) return cookieToken;
@@ -55,7 +54,6 @@ export async function ensureUser(
   jwt: JwtService,
   prisma?: PrismaService,
 ): Promise<RequestUser> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existing = (req as any).user as RequestUser | undefined;
   if (existing) return existing;
 
@@ -71,7 +69,6 @@ export async function ensureUser(
 
     if (!payload?.type) throw new UnauthorizedException('INVALID_ACCESS_TOKEN');
 
-    // session tekshiruvi (revoked/expired)
     if (prisma && payload.sessionId) {
       const sid = safeBigIntFromDigits(payload.sessionId);
       if (!sid) throw new UnauthorizedException('INVALID_ACCESS_TOKEN');

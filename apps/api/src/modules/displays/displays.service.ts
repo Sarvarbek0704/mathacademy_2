@@ -125,7 +125,8 @@ export class DisplaysService {
       } else if (args.query.sortBy === 'id') {
         orderBy.id = args.query.sortDir ?? 'desc';
       } else {
-        (orderBy as any).created_at = args.query.sortDir ?? 'desc';
+        // displays modelida created_at yo'q, shuning uchun default sort -> id
+        orderBy.id = args.query.sortDir ?? 'desc';
       }
 
       const [total, items] = await this.prisma.$transaction([

@@ -1,4 +1,4 @@
-// apps/api/src/modules/academic-years/academic-years.service.ts
+
 import {
   BadRequestException,
   ConflictException,

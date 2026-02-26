@@ -1,4 +1,3 @@
-// apps/api/src/modules/assessments/assessments.module.ts
 import { Module } from '@nestjs/common';
 import { AssessmentsService } from './assessments.service';
 import {

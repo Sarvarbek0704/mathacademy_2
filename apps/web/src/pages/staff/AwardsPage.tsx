@@ -11,7 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Trophy, Medal, Award, Pencil, Trash2, Loader2, User, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function AwardsPage() {
   const queryClient = useQueryClient();
@@ -19,25 +25,25 @@ export default function AwardsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
-  
-  const [form, setForm] = useState({ 
-    studentId: '', 
-    type: 'AWARD', 
-    title: '', 
-    description: '', 
-    issuedDate: new Date().toISOString().split('T')[0] 
+
+  const [form, setForm] = useState({
+    studentId: '',
+    awardType: 'GIFT',
+    title: '',
+    description: '',
+    issuedDate: new Date().toISOString().split('T')[0],
   });
 
   // Queries
   const { data: awardsRes, isLoading } = useQuery({
     queryKey: ['staff', 'awards'],
-    queryFn: async () => (await api.get('/staff/awards')).data
+    queryFn: async () => (await api.get('/staff/awards')).data,
   });
   const awards = awardsRes?.data || [];
 
   const { data: studentsRes } = useQuery({
     queryKey: ['staff', 'students-simple'],
-    queryFn: async () => (await api.get('/staff/students?limit=500')).data
+    queryFn: async () => (await api.get('/staff/students?limit=200')).data,
   });
   const students = studentsRes?.data || [];
 
@@ -48,61 +54,110 @@ export default function AwardsPage() {
       queryClient.invalidateQueries({ queryKey: ['staff', 'awards'] });
       toast.success('Muvaffaqiyatli saqlandi');
       setModalOpen(false);
-    }
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.patch(`/staff/awards/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff', 'awards'] });
-      toast.success('Ma\'lumot yangilandi');
+      toast.success("Ma'lumot yangilandi");
       setModalOpen(false);
-    }
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/staff/awards/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff', 'awards'] });
-      toast.success('O\'chirildi');
+      toast.success("O'chirildi");
       setDeleteOpen(false);
-    }
+    },
   });
 
   const columns: Column<any>[] = [
-    { 
-      key: 'type', title: 'Turi', 
-      render: (item) => (
-        <div className="flex items-center gap-2">
-          {item.type === 'AWARD' ? <Trophy className="h-4 w-4 text-warning" /> : <Award className="h-4 w-4 text-info" />}
-          <span className="text-xs font-bold uppercase">{item.type}</span>
-        </div>
-      )
+    {
+      key: 'type',
+      title: 'Turi',
+      render: (item) => {
+        const type = item.awardType || item.type;
+        return (
+          <div className="flex items-center gap-2">
+            {type === 'GIFT' ? (
+              <Trophy className="h-4 w-4 text-warning" />
+            ) : type === 'STIPEND' ? (
+              <Medal className="h-4 w-4 text-emerald-600" />
+            ) : (
+              <Award className="h-4 w-4 text-info" />
+            )}
+            <span className="text-xs font-bold uppercase">{type}</span>
+          </div>
+        );
+      },
     },
-    { 
-      key: 'student', title: 'O\'quvchi', 
+    {
+      key: 'student',
+      title: "O'quvchi",
       render: (item) => (
         <div className="flex items-center gap-2">
           <User className="h-3 w-3 text-muted-foreground" />
-          <span className="font-medium">{item.studentName || item.student?.fullName || 'Noma\'lum'}</span>
+          <span className="font-medium">
+            {item.studentName || item.student?.fullName || "Noma'lum"}
+          </span>
         </div>
-      )
+      ),
     },
-    { key: 'title', title: 'Nomi', render: (item) => <span className="font-bold">{item.title}</span> },
-    { key: 'issuedDate', title: 'Sana', render: (item) => item.issuedDate ? new Date(item.issuedDate).toLocaleDateString('uz') : '-' }
+    {
+      key: 'title',
+      title: 'Nomi',
+      render: (item) => <span className="font-bold">{item.title}</span>,
+    },
+    {
+      key: 'issuedDate',
+      title: 'Sana',
+      render: (item) => {
+        const issued = item.issuedAt || item.issuedDate;
+        return issued ? new Date(issued).toLocaleDateString('uz') : '-';
+      },
+    },
   ];
 
   const handleSubmit = () => {
-    if (editing) updateMutation.mutate({ id: editing.id, data: form });
-    else createMutation.mutate(form);
+    if (!form.title.trim()) {
+      toast.error('Mukofot nomini kiriting');
+      return;
+    }
+
+    const payload = {
+      awardType: form.awardType,
+      title: form.title.trim(),
+      description: form.description?.trim() || undefined,
+      issuedAt: form.issuedDate ? new Date(`${form.issuedDate}T00:00:00`).toISOString() : undefined,
+    };
+
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload });
+    else createMutation.mutate(payload);
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Mukofotlar va Sertifikatlar" 
-        description="O'quvchilarning erishgan yutuqlari, IELTS/SAT sertifikatlari va mukofotlari hisobi." 
-        action={{ label: "Yangi yutuq qo'shish", onClick: () => { setEditing(null); setForm({ studentId: '', type: 'AWARD', title: '', description: '', issuedDate: new Date().toISOString().split('T')[0] }); setModalOpen(true); } }}
+      <PageHeader
+        title="Mukofotlar va Sertifikatlar"
+        description="O'quvchilarning erishgan yutuqlari, IELTS/SAT sertifikatlari va mukofotlari hisobi."
+        action={{
+          label: "Yangi yutuq qo'shish",
+          onClick: () => {
+            setEditing(null);
+            setForm({
+              studentId: '',
+              awardType: 'GIFT',
+              title: '',
+              description: '',
+              issuedDate: new Date().toISOString().split('T')[0],
+            });
+            setModalOpen(true);
+          },
+        }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -115,43 +170,67 @@ export default function AwardsPage() {
         </Button>
       </div>
 
-      <DataTable 
-        columns={columns} 
-        data={awards} 
+      <DataTable
+        columns={columns}
+        data={awards}
         loading={isLoading}
         actions={(item) => (
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => { 
-                setEditing(item); 
-                setForm({ 
-                    studentId: item.studentId || item.student?.id || '', 
-                    type: item.type || 'AWARD', 
-                    title: item.title || '', 
-                    description: item.description || '', 
-                    issuedDate: item.issuedDate ? new Date(item.issuedDate).toISOString().split('T')[0] : '' 
-                }); 
-                setModalOpen(true); 
-            }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setEditing(item);
+                setForm({
+                  studentId: item.studentId || item.student?.id || '',
+                  awardType: item.awardType || item.type || 'GIFT',
+                  title: item.title || '',
+                  description: item.description || '',
+                  issuedDate:
+                    item.issuedAt || item.issuedDate
+                      ? new Date(item.issuedAt || item.issuedDate).toISOString().split('T')[0]
+                      : '',
+                });
+                setModalOpen(true);
+              }}
+            >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setDeleting(item); setDeleteOpen(true); }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setDeleting(item);
+                setDeleteOpen(true);
+              }}
+            >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         )}
       />
 
-      <SlideOver open={modalOpen} onOpenChange={setModalOpen} title={editing ? 'Tahrirlash' : "Yangi ma'lumot qo'shish"} size="md">
+      <SlideOver
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={editing ? 'Tahrirlash' : "Yangi ma'lumot qo'shish"}
+        size="md"
+      >
         <div className="space-y-5 pt-4">
           <div className="space-y-2">
             <Label>O'quvchi</Label>
-            <Select value={form.studentId} onValueChange={v => setForm({ ...form, studentId: v })}>
-              <SelectTrigger><SelectValue placeholder="O'quvchini tanlang" /></SelectTrigger>
+            <Select
+              value={form.studentId}
+              onValueChange={(v) => setForm({ ...form, studentId: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="O'quvchini tanlang" />
+              </SelectTrigger>
               <SelectContent>
                 {students.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                        {s.full_name || s.fullName} ({s.group_name || s.groupName || 'Guruhsiz'})
-                    </SelectItem>
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.full_name || s.fullName} ({s.group_name || s.groupName || 'Guruhsiz'})
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -160,45 +239,74 @@ export default function AwardsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Turi</Label>
-              <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={form.awardType}
+                onValueChange={(v) => setForm({ ...form, awardType: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="AWARD">Mukofot (Award)</SelectItem>
-                  <SelectItem value="CERTIFICATE">Sertifikat (IELTS, SAT, etc)</SelectItem>
-                  <SelectItem value="MEDAL">Medal</SelectItem>
+                  <SelectItem value="GIFT">Sovg'a (GIFT)</SelectItem>
+                  <SelectItem value="STIPEND">Stipendiya (STIPEND)</SelectItem>
+                  <SelectItem value="CERTIFICATE">Sertifikat (CERTIFICATE)</SelectItem>
+                  <SelectItem value="BADGE">Nishon (BADGE)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Sana</Label>
-              <Input type="date" value={form.issuedDate} onChange={e => setForm({ ...form, issuedDate: e.target.value })} />
+              <Input
+                type="date"
+                value={form.issuedDate}
+                onChange={(e) => setForm({ ...form, issuedDate: e.target.value })}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Nomi / Sarlavha</Label>
-            <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Masalan: IELTS 8.5, Matematika olimpiadasi 1-o'rin" />
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Masalan: IELTS 8.5, Matematika olimpiadasi 1-o'rin"
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Tavsif (Ixtiyoriy)</Label>
-            <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Batafsil ma'lumot..." className="min-h-[100px]" />
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Batafsil ma'lumot..."
+              className="min-h-[100px]"
+            />
           </div>
 
           <div className="flex justify-end gap-2 mt-8 pt-4 border-t">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Bekor qilish</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
-              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              Bekor qilish
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Saqlash
             </Button>
           </div>
         </div>
       </SlideOver>
 
-      <ConfirmDialog 
-        open={deleteOpen} onOpenChange={setDeleteOpen} 
-        title="O'chirish" description="Ushbu yutuq ma'lumotini o'chirmoqchimisiz?"
-        confirmText="O'chirish" variant="destructive" 
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="O'chirish"
+        description="Ushbu yutuq ma'lumotini o'chirmoqchimisiz?"
+        confirmText="O'chirish"
+        variant="destructive"
         onConfirm={() => deleteMutation.mutate(deleting.id)}
       />
     </div>

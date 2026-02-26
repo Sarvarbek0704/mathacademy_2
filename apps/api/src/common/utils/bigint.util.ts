@@ -8,7 +8,6 @@ export function parseBigIntId(v: unknown, field = 'id'): bigint {
     throw new BadRequestException(`INVALID_${field.toUpperCase()}`);
   }
 
-  // regex bilan tekshirgani uchun BigInt odatda throw qilmaydi, lekin baribir try/catch xavfsizroq
   try {
     const n = BigInt(s);
     if (n <= 0n) throw new Error('non-positive');

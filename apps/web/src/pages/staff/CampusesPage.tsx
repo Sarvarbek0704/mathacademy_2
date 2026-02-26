@@ -7,59 +7,73 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Building2, 
-  MapPin, 
-  Trash2, 
-  Edit2, 
-  Plus, 
+import {
+  Building2,
+  MapPin,
+  Trash2,
+  Edit2,
+  Plus,
   Loader2,
   ExternalLink,
   Phone,
   Mail,
-  Users
+  Users,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export default function CampusesPage() {
-  const { data, loading, create, remove, update } = useCrud({ endpoint: '/campuses' });
+  const { data, loading, create, remove, update } = useCrud({ endpoint: '/staff/campuses' });
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCampus, setSelectedCampus] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   // Form state
-  const [form, setForm] = useState({ 
-    name: '', 
-    address: '', 
-    phone: '', 
-    email: '' 
+  const [form, setForm] = useState({
+    name: '',
+    address: '',
+    lat: '',
+    lng: '',
   });
 
   const handleCreateOrUpdate = async () => {
+    const payload = {
+      name: form.name.trim(),
+      address: form.address.trim() || undefined,
+      lat: form.lat.trim() ? Number(form.lat) : undefined,
+      lng: form.lng.trim() ? Number(form.lng) : undefined,
+    };
+
     if (isEditing) {
-      await update(selectedCampus.id, form);
+      await update(selectedCampus.id, payload);
     } else {
-      await create(form);
+      await create(payload);
     }
     setModalOpen(false);
   };
 
   const openCreate = () => {
-    setForm({ name: '', address: '', phone: '', email: '' });
+    setForm({ name: '', address: '', lat: '', lng: '' });
     setIsEditing(false);
     setModalOpen(true);
   };
 
   const openEdit = (campus: any) => {
     setSelectedCampus(campus);
-    setForm({ 
-      name: campus.name, 
-      address: campus.address || '', 
-      phone: campus.phone || '', 
-      email: campus.email || '' 
+    setForm({
+      name: campus.name || '',
+      address: campus.address || '',
+      lat: campus.lat !== null && campus.lat !== undefined ? String(campus.lat) : '',
+      lng: campus.lng !== null && campus.lng !== undefined ? String(campus.lng) : '',
     });
     setIsEditing(true);
     setModalOpen(true);
@@ -67,14 +81,14 @@ export default function CampusesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Kampuslar boshqaruvi" 
-        description="Akademiya hududlari va bino ma'lumotlari" 
-        action={{ 
-          label: "Kampus qo'shish", 
+      <PageHeader
+        title="Kampuslar boshqaruvi"
+        description="Akademiya hududlari va bino ma'lumotlari"
+        action={{
+          label: "Kampus qo'shish",
           icon: <Plus className="h-4 w-4" />,
-          onClick: openCreate
-        }} 
+          onClick: openCreate,
+        }}
       />
 
       {loading ? (
@@ -84,17 +98,33 @@ export default function CampusesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.map((campus: any) => (
-            <Card key={campus.id} className="group hover:border-primary/50 transition-all overflow-hidden flex flex-col h-full">
+            <Card
+              key={campus.id}
+              className="group hover:border-primary/50 transition-all overflow-hidden flex flex-col h-full"
+            >
               <CardHeader className="p-5">
                 <div className="flex justify-between items-start">
                   <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                     <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(campus)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEdit(campus)}
+                    >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { setSelectedCampus(campus); setDeleteOpen(true); }}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => {
+                        setSelectedCampus(campus);
+                        setDeleteOpen(true);
+                      }}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -107,29 +137,33 @@ export default function CampusesPage() {
                     <MapPin className="h-4 w-4 text-primary shrink-0" />
                     <span className="leading-tight">{campus.address || 'Manzil kiritilmagan'}</span>
                   </div>
-                  {campus.phone && (
+                  {(campus.lat !== null && campus.lat !== undefined) ||
+                  (campus.lng !== null && campus.lng !== undefined) ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span>{campus.phone}</span>
+                      <span>
+                        Koordinata: {String(campus.lat ?? '-')} , {String(campus.lng ?? '-')}
+                      </span>
                     </div>
-                  )}
-                  {campus.email && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span>{campus.email}</span>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
-                
+
                 <div className="pt-2 flex items-center gap-4">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Guruhlar</span>
-                    <span className="text-sm font-semibold">{campus.groupCount || 0}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
+                      Guruhlar
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {campus.groupsCount || campus.groupCount || 0}
+                    </span>
                   </div>
                   <div className="w-px h-8 bg-border" />
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">O'quvchilar</span>
-                    <span className="text-sm font-semibold">{campus.studentCount || 0}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
+                      O'quvchilar
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {campus.studentsCount || campus.studentCount || 0}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -144,31 +178,59 @@ export default function CampusesPage() {
       )}
 
       {/* Form SlideOver */}
-      <SlideOver open={modalOpen} onOpenChange={setModalOpen} title={isEditing ? "Kampusni tahrirlash" : "Yangi kampus qo'shish"} size="sm">
+      <SlideOver
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={isEditing ? 'Kampusni tahrirlash' : "Yangi kampus qo'shish"}
+        size="sm"
+      >
         <div className="space-y-6">
           <div className="space-y-2">
             <Label>Nomi</Label>
-            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Masalan: Bosh bino" />
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Masalan: Bosh bino"
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Manzili</Label>
-            <Textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Toliq manzil..." rows={3} />
+            <Textarea
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Toliq manzil..."
+              rows={3}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Telefon</Label>
-              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+998..." />
+              <Label>Latitude</Label>
+              <Input
+                value={form.lat}
+                onChange={(e) => setForm({ ...form, lat: e.target.value })}
+                placeholder="41.2995"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="campus@math.uz" />
+              <Label>Longitude</Label>
+              <Input
+                value={form.lng}
+                onChange={(e) => setForm({ ...form, lng: e.target.value })}
+                placeholder="69.2401"
+              />
             </div>
           </div>
 
           <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setModalOpen(false)}>Bekor qilish</Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setModalOpen(false)}
+            >
+              Bekor qilish
+            </Button>
             <Button className="w-full sm:w-auto" onClick={handleCreateOrUpdate}>
               {isEditing ? 'Saqlash' : 'Yaratish'}
             </Button>
@@ -176,14 +238,17 @@ export default function CampusesPage() {
         </div>
       </SlideOver>
 
-      <ConfirmDialog 
-        open={deleteOpen} 
-        onOpenChange={setDeleteOpen} 
-        title="O'chirish" 
-        description="Ushbu kampusni o'chirishga ishonchingiz komilmi? Bu amalni ortga qaytarib bo'lmaydi." 
-        confirmText="O'chirish" 
-        variant="destructive" 
-        onConfirm={async () => { await remove(selectedCampus.id); setDeleteOpen(false); }} 
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="O'chirish"
+        description="Ushbu kampusni o'chirishga ishonchingiz komilmi? Bu amalni ortga qaytarib bo'lmaydi."
+        confirmText="O'chirish"
+        variant="destructive"
+        onConfirm={async () => {
+          await remove(selectedCampus.id);
+          setDeleteOpen(false);
+        }}
       />
     </div>
   );

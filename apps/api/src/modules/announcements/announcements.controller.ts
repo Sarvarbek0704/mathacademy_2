@@ -153,7 +153,6 @@ export class GuardianAnnouncementsController {
     if (!user || user.type !== 'GUARDIAN') {
       throw new UnauthorizedException('NOT_GUARDIAN');
     }
-    // Guardian can only see published announcements with audience = GUARDIANS or ALL
     return this.svc.listForGuardian({
       tenantId: String(user.tenantId || ''),
       query,

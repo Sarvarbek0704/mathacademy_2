@@ -4,19 +4,17 @@ import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
 import * as path from 'path';
 
-// .env faylini yuklash (apps/api/.env)
 const envPath = path.join(__dirname, '..', '.env');
-console.log('🔍 Loading .env from:', envPath);
+console.log('Loading .env from:', envPath);
 config({ path: envPath });
 
-// DATABASE_URL mavjudligini tekshirish
 if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
-  console.error('❌ DATABASE_URL environment variable is not set or empty');
+  console.error('DATABASE_URL environment variable is not set or empty');
   console.error('Please make sure apps/api/.env file exists with DATABASE_URL');
   process.exit(1);
 }
 console.log(
-  '✅ DATABASE_URL found (first 20 chars):',
+  'DATABASE_URL found (first 20 chars):',
   process.env.DATABASE_URL.substring(0, 20) + '...',
 );
 
@@ -27,7 +25,6 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // 1. Tenant
   const tenant = await prisma.tenants.upsert({
     where: { slug: 'mathacademy' },
     update: {},
@@ -38,9 +35,7 @@ async function main() {
     },
   });
 
-  // 2. Permissions
   const permissions = [
-    // Generated from all RequirePermissions() occurrences in controllers
     'academic_years.delete',
     'academic_years.read',
     'academic_years.write',
@@ -112,7 +107,6 @@ async function main() {
     permissionRecords.push(perm);
   }
 
-  // 3. Rollar
   const superadminRole = await prisma.roles.upsert({
     where: { tenant_id_name: { tenant_id: tenant.id, name: 'SUPERADMIN' } },
     update: {},
@@ -155,7 +149,6 @@ async function main() {
     });
   }
 
-  // Default permission sets (Superadmin can later customize)
   const allCodes = new Set(permissionRecords.map((p) => p.code));
   const denyAdmin = new Set(['permissions.manage', 'roles.manage', 'users.manage']);
 
@@ -206,7 +199,6 @@ async function main() {
     }
   }
 
-  // ADMIN: everything except a few management-only permissions
   await attachPerms(
     adminRole.id,
     new Set([...allCodes].filter((c) => !denyAdmin.has(c))),
@@ -214,7 +206,6 @@ async function main() {
   await attachPerms(teacherRole.id, teacherAllow);
   await attachPerms(assistantTeacherRole.id, assistantAllow);
 
-  // 4. Superadmin foydalanuvchi
   const adminPassword = await bcrypt.hash('pass1234', 10);
   const admin = await prisma.users.upsert({
     where: { tenant_id_username: { tenant_id: tenant.id, username: 'admin' } },
@@ -236,7 +227,6 @@ async function main() {
     create: { user_id: admin.id, role_id: superadminRole.id },
   });
 
-  // 5. Living types
   const livingTypes = [
     { code: 'DAY_ONLY', name: 'Home commuter (lunch only)' },
     { code: 'WEEKDAYS_ONLY', name: 'Weekday resident (Mon–Fri)' },

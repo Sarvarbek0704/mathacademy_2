@@ -18,7 +18,6 @@ export function parseDateOnly(v: string, field = 'date'): Date {
   if (!DATE_ONLY_RE.test(s))
     throw new BadRequestException(`INVALID_${field.toUpperCase()}`);
 
-  // date-only ustunlar uchun UTC 00:00
   return new Date(`${s}T00:00:00.000Z`);
 }
 

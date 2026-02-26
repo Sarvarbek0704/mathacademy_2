@@ -1,62 +1,63 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/lib/auth";
-import { ThemeProvider } from "@/lib/theme";
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/lib/auth';
+import { ThemeProvider } from '@/lib/theme';
 
-import StaffLogin from "./pages/staff/StaffLogin";
-import GuardianLogin from "./pages/guardian/GuardianLogin";
-import { StaffLayout } from "./components/layout/StaffLayout";
-import { GuardianLayout } from "./components/layout/GuardianLayout";
+import StaffLogin from './pages/staff/StaffLogin';
+import GuardianLogin from './pages/guardian/GuardianLogin';
+import { StaffLayout } from './components/layout/StaffLayout';
+import { GuardianLayout } from './components/layout/GuardianLayout';
 
-import StaffDashboard from "./pages/staff/StaffDashboard";
-import StudentsPage from "./pages/staff/StudentsPage";
-import UsersPage from "./pages/staff/UsersPage";
-import AcademicYearsPage from "./pages/staff/AcademicYearsPage";
-import GroupsPage from "./pages/staff/GroupsPage";
-import AssessmentsPage from "./pages/staff/AssessmentsPage";
-import AttendancePage from "./pages/staff/AttendancePage";
-import RankingPage from "./pages/staff/RankingPage";
-import RiskPage from "./pages/staff/RiskPage";
-import ViolationsPage from "./pages/staff/ViolationsPage";
-import DisciplineActionsPage from "./pages/staff/DisciplineActionsPage";
-import LeavesPage from "./pages/staff/LeavesPage";
-import PaymentsPage from "./pages/staff/PaymentsPage";
-import InvoicesPage from "./pages/staff/InvoicesPage";
-import RolesPage from "./pages/staff/RolesPage";
-import TimetablePage from "./pages/staff/TimetablePage";
-import StaffAnnouncementsPage from "./pages/staff/StaffAnnouncementsPage";
-import AwardsPage from "./pages/staff/AwardsPage";
-import SimpleCrudPage from "./pages/staff/SimpleCrudPage";
-import MealBillingPage from "./pages/staff/MealBillingPage";
-import DormBillingPage from "./pages/staff/DormBillingPage";
-import DisplaysPage from "./pages/staff/DisplaysPage";
-import CertificatesPage from "./pages/staff/CertificatesPage";
-import CompetitionsPage from "./pages/staff/CompetitionsPage";
-import TracksPage from "./pages/staff/TracksPage";
-import CohortsPage from "./pages/staff/CohortsPage";
-import SubjectsPage from "./pages/staff/SubjectsPage";
-import CampusesPage from "./pages/staff/CampusesPage";
-import NotificationsPage from "./pages/staff/NotificationsPage";
-import ReportsPage from "./pages/staff/ReportsPage";
-import EventsPage from "./pages/staff/EventsPage";
-import DormsPage from "./pages/staff/DormsPage";
-import MediaCenterPage from "./pages/staff/MediaCenterPage";
-import GuardianDashboard from "./pages/guardian/GuardianDashboard";
-import GuardianStudent from "./pages/guardian/GuardianStudent";
-import GuardianGrades from "./pages/guardian/GuardianGrades";
-import GuardianAttendance from "./pages/guardian/GuardianAttendance";
-import GuardianDiscipline from "./pages/guardian/GuardianDiscipline";
-import GuardianBilling from "./pages/guardian/GuardianBilling";
-import GuardianEvents from "./pages/guardian/GuardianEvents";
-import GuardianNotifications from "./pages/guardian/GuardianNotifications";
-import GuardianCertificates from "./pages/guardian/GuardianCertificates";
-import GuardianTimetable from "./pages/guardian/GuardianTimetable";
-import GuardianAnnouncements from "./pages/guardian/GuardianAnnouncements";
+import StaffDashboard from './pages/staff/StaffDashboard';
+import StudentsPage from './pages/staff/StudentsPage';
+import StudentDetailPage from './pages/staff/StudentDetailPage';
+import UsersPage from './pages/staff/UsersPage';
+import AcademicYearsPage from './pages/staff/AcademicYearsPage';
+import GroupsPage from './pages/staff/GroupsPage';
+import AssessmentsPage from './pages/staff/AssessmentsPage';
+import AttendancePage from './pages/staff/AttendancePage';
+import RankingPage from './pages/staff/RankingPage';
+import RiskPage from './pages/staff/RiskPage';
+import ViolationsPage from './pages/staff/ViolationsPage';
+import DisciplineActionsPage from './pages/staff/DisciplineActionsPage';
+import LeavesPage from './pages/staff/LeavesPage';
+import PaymentsPage from './pages/staff/PaymentsPage';
+import InvoicesPage from './pages/staff/InvoicesPage';
+import RolesPage from './pages/staff/RolesPage';
+import TimetablePage from './pages/staff/TimetablePage';
+import StaffAnnouncementsPage from './pages/staff/StaffAnnouncementsPage';
+import AwardsPage from './pages/staff/AwardsPage';
+import SimpleCrudPage from './pages/staff/SimpleCrudPage';
+import MealBillingPage from './pages/staff/MealBillingPage';
+import DormBillingPage from './pages/staff/DormBillingPage';
+import DisplaysPage from './pages/staff/DisplaysPage';
+import CertificatesPage from './pages/staff/CertificatesPage';
+import CompetitionsPage from './pages/staff/CompetitionsPage';
+import TracksPage from './pages/staff/TracksPage';
+import CohortsPage from './pages/staff/CohortsPage';
+import SubjectsPage from './pages/staff/SubjectsPage';
+import CampusesPage from './pages/staff/CampusesPage';
+import NotificationsPage from './pages/staff/NotificationsPage';
+import ReportsPage from './pages/staff/ReportsPage';
+import EventsPage from './pages/staff/EventsPage';
+import DormsPage from './pages/staff/DormsPage';
+import MediaCenterPage from './pages/staff/MediaCenterPage';
+import GuardianDashboard from './pages/guardian/GuardianDashboard';
+import GuardianStudent from './pages/guardian/GuardianStudent';
+import GuardianGrades from './pages/guardian/GuardianGrades';
+import GuardianAttendance from './pages/guardian/GuardianAttendance';
+import GuardianDiscipline from './pages/guardian/GuardianDiscipline';
+import GuardianBilling from './pages/guardian/GuardianBilling';
+import GuardianEvents from './pages/guardian/GuardianEvents';
+import GuardianNotifications from './pages/guardian/GuardianNotifications';
+import GuardianCertificates from './pages/guardian/GuardianCertificates';
+import GuardianTimetable from './pages/guardian/GuardianTimetable';
+import GuardianAnnouncements from './pages/guardian/GuardianAnnouncements';
 
-import NotFound from "./pages/NotFound";
+import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="/staff" element={<StaffLayout />}>
                 <Route path="dashboard" element={<StaffDashboard />} />
                 <Route path="students" element={<StudentsPage />} />
+                <Route path="students/:id" element={<StudentDetailPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="academic-years" element={<AcademicYearsPage />} />
                 <Route path="groups" element={<GroupsPage />} />
