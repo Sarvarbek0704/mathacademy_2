@@ -655,7 +655,7 @@ export default function StudentsPage() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="O'quvchini o'chirish"
-        description={`"${getDisplayName(deleting)}" ni o'chirishga ishonchingiz komilmi? Bu amal qaytarib bo'lmaydi.`}
+        description={`"${deleting ? getDisplayName(deleting) : ''}" ni o'chirishga ishonchingiz komilmi? Bu amal qaytarib bo'lmaydi.`}
         confirmText="O'chirish"
         variant="destructive"
         onConfirm={handleDelete}

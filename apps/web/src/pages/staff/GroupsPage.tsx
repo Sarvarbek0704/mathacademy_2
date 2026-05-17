@@ -21,11 +21,10 @@ import {
   Search,
   Loader2,
   Calendar,
-  GraduationCap,
   UserCheck,
-  MoreVertical,
   LayoutGrid,
   List as ListIcon,
+  Route,
 } from 'lucide-react';
 import {
   Card,
@@ -39,18 +38,18 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Progress } from '@/components/ui/progress';
 
 export default function GroupsPage() {
-  const { data, loading, total, page, totalPages, setSearch, setPage, create, update, remove } =
+  const { data, loading, setSearch, create, update, remove } =
     useCrud({ endpoint: '/staff/groups' });
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+  const [filterTrackId, setFilterTrackId] = useState('all');
 
-  const [form, setForm] = useState({ name: '', grade: '10', academicYearId: '' });
+  const [form, setForm] = useState({ name: '', grade: '10', academicYearId: '', trackId: '' });
 
   const { data: currentAy } = useQuery({
     queryKey: ['academic-years', 'current', 'for_groups'],
@@ -68,29 +67,40 @@ export default function GroupsPage() {
     },
   });
 
-  const handleCreateOrUpdate = async () => {
-    if (!form.name.trim()) {
-      toast.error("Guruh nomi kiritilishi shart");
-      return;
-    }
-    if (!form.academicYearId) {
-      toast.error("Akademik yil tanlanishi shart");
-      return;
-    }
+  const { data: tracksRes } = useQuery({
+    queryKey: ['staff', 'tracks', 'for-groups'],
+    queryFn: async () => (await api.get('/staff/tracks?limit=100')).data,
+  });
+  const tracks = tracksRes?.data || [];
 
-    const payload = {
+  const handleCreateOrUpdate = async () => {
+    if (!form.name.trim()) { toast.error('Guruh nomi kiritilishi shart'); return; }
+    if (!form.academicYearId) { toast.error('Akademik yil tanlanishi shart'); return; }
+
+    const payload: any = {
       name: form.name.trim(),
       grade: parseInt(form.grade, 10),
       academicYearId: form.academicYearId,
     };
+    if (form.trackId && form.trackId !== 'none') payload.trackId = form.trackId;
 
     try {
       if (editing) await update(editing.id, payload);
       else await create(payload);
       setModalOpen(false);
-    } catch (error) {
-      // useCrud already handles toast errors but we can add more if needed
-    }
+    } catch {}
+  };
+
+  const filteredData = filterTrackId === 'all'
+    ? data
+    : data.filter((g: any) =>
+        filterTrackId === 'none' ? !g.trackId : String(g.trackId) === filterTrackId
+      );
+
+  const getTrackColor = (group: any): string | null => {
+    if (group.track?.color) return group.track.color;
+    const t = tracks.find((t: any) => String(t.id) === String(group.trackId));
+    return t?.color || null;
   };
 
   return (
@@ -107,13 +117,14 @@ export default function GroupsPage() {
               name: '',
               grade: '10',
               academicYearId: currentAy?.id ? String(currentAy.id) : '',
+              trackId: '',
             });
             setModalOpen(true);
           },
         }}
       />
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -122,6 +133,23 @@ export default function GroupsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        {tracks.length > 0 && (
+          <Select value={filterTrackId} onValueChange={setFilterTrackId}>
+            <SelectTrigger className="w-48 shrink-0">
+              <Route className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Yo'nalish" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Barcha yo'nalishlar</SelectItem>
+              <SelectItem value="none">Yo'nalishsiz</SelectItem>
+              {tracks.map((t: any) => (
+                <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="flex bg-muted p-1 rounded-lg shrink-0">
           <Button
             variant={viewMode === 'GRID' ? 'secondary' : 'ghost'}
@@ -146,6 +174,11 @@ export default function GroupsPage() {
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
         </div>
+      ) : filteredData.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
+          <p className="text-muted-foreground font-medium">Guruhlar topilmadi</p>
+        </div>
       ) : (
         <div
           className={
@@ -154,16 +187,28 @@ export default function GroupsPage() {
               : 'space-y-3'
           }
         >
-          {data.map((group: any) =>
-            viewMode === 'GRID' ? (
+          {filteredData.map((group: any) => {
+            const trackColor = getTrackColor(group);
+            return viewMode === 'GRID' ? (
               <Card
                 key={group.id}
                 className="group hover:border-primary/50 transition-all flex flex-col h-full shadow-sm overflow-hidden"
+                style={trackColor ? { borderTopColor: trackColor, borderTopWidth: 3 } : undefined}
               >
                 <CardHeader className="p-5 pb-0">
                   <div className="flex justify-between items-start">
-                    <div className="h-10 w-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
-                      <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <div
+                      className="h-10 w-10 rounded-xl flex items-center justify-center border"
+                      style={
+                        trackColor
+                          ? { backgroundColor: `${trackColor}1a`, borderColor: `${trackColor}40` }
+                          : { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' }
+                      }
+                    >
+                      <Users
+                        className="h-5 w-5"
+                        style={trackColor ? { color: trackColor } : { color: '#4f46e5' }}
+                      />
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
@@ -175,60 +220,61 @@ export default function GroupsPage() {
                           setForm({
                             name: group.name,
                             grade: String(group.grade || '10'),
-                            academicYearId: group.academicYearId
-                              ? String(group.academicYearId)
-                              : '',
+                            academicYearId: group.academicYearId ? String(group.academicYearId) : '',
+                            trackId: group.trackId ? String(group.trackId) : '',
                           });
                           setModalOpen(true);
                         }}
                       >
-                        {' '}
-                        <Edit2 className="h-4 w-4" />{' '}
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive"
-                        onClick={() => {
-                          setDeleting(group);
-                          setDeleteOpen(true);
-                        }}
+                        onClick={() => { setDeleting(group); setDeleteOpen(true); }}
                       >
-                        {' '}
-                        <Trash2 className="h-4 w-4" />{' '}
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                   <div className="mt-4">
                     <CardTitle className="text-xl font-black">{group.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-2 mt-1">
+                    <CardDescription className="flex flex-wrap items-center gap-2 mt-1">
                       <Badge
                         variant="secondary"
                         className="text-[10px] uppercase font-bold tracking-wider px-2 py-0"
                       >
                         {group.grade}-sinf
                       </Badge>
+                      {group.track && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-2 py-0"
+                          style={trackColor ? { borderColor: trackColor, color: trackColor } : undefined}
+                        >
+                          {group.track.name}
+                        </Badge>
+                      )}
                       <span className="text-[10px] font-mono text-muted-foreground">
-                        • {group.academicYear?.name}
+                        {group.academicYear?.name}
                       </span>
                     </CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="p-5 flex-1 flex flex-col justify-end space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <UserCheck className="h-3 w-3 text-primary" /> Sig'im
-                      </span>
-                      <span>{group.studentCount || 0} / 25</span>
-                    </div>
-                    <Progress value={((group.studentCount || 0) / 25) * 100} className="h-1.5" />
+                <CardContent className="p-5 flex-1 flex flex-col justify-end">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                    <UserCheck className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-foreground">{group.studentCount || 0}</span>
+                    <span>o'quvchi</span>
                   </div>
                 </CardContent>
                 <CardFooter className="p-4 border-t bg-muted/20 flex justify-between text-[11px] font-medium text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Boshlangan: 02.09.2024
+                    {group.academicYear?.startDate
+                      ? new Date(group.academicYear.startDate).toLocaleDateString('uz')
+                      : '—'}
                   </div>
                   <div className="hover:text-primary cursor-pointer transition-colors">
                     Ro'yxatni ko'rish →
@@ -242,13 +288,21 @@ export default function GroupsPage() {
               >
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-8 w-8 bg-indigo-100 rounded-lg flex items-center justify-center font-bold text-indigo-700 text-xs">
+                    <div
+                      className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs"
+                      style={
+                        trackColor
+                          ? { backgroundColor: `${trackColor}1a`, color: trackColor }
+                          : { backgroundColor: '#e0e7ff', color: '#4f46e5' }
+                      }
+                    >
                       {group.name.slice(0, 2)}
                     </div>
                     <div>
                       <p className="text-sm font-bold">{group.name}</p>
                       <p className="text-[10px] text-muted-foreground uppercase">
                         {group.grade}-sinf • {group.studentCount || 0} o'quvchi
+                        {group.track && ` • ${group.track.name}`}
                       </p>
                     </div>
                   </div>
@@ -263,18 +317,26 @@ export default function GroupsPage() {
                           name: group.name,
                           grade: String(group.grade || '10'),
                           academicYearId: group.academicYearId ? String(group.academicYearId) : '',
+                          trackId: group.trackId ? String(group.trackId) : '',
                         });
                         setModalOpen(true);
                       }}
                     >
-                      {' '}
-                      <Edit2 className="h-3.5 w-3.5" /> Tahrirlash{' '}
+                      <Edit2 className="h-3.5 w-3.5" /> Tahrirlash
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-destructive"
+                      onClick={() => { setDeleting(group); setDeleteOpen(true); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            ),
-          )}
+            );
+          })}
         </div>
       )}
 
@@ -287,7 +349,7 @@ export default function GroupsPage() {
       >
         <div className="space-y-6 pt-4">
           <div className="space-y-2">
-            <Label>Guruh nomi</Label>
+            <Label>Guruh nomi *</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -322,10 +384,9 @@ export default function GroupsPage() {
                 <SelectValue placeholder="Akademik yil tanlang..." />
               </SelectTrigger>
               <SelectContent>
-                {allAcademicYears?.map((ay: any) => (
+                {(allAcademicYears || []).map((ay: any) => (
                   <SelectItem key={ay.id} value={String(ay.id)}>
-                    {ay.name}
-                    {ay.is_current ? ' (Joriy)' : ''}
+                    {ay.name}{ay.isCurrent ? ' (Joriy)' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -333,6 +394,24 @@ export default function GroupsPage() {
             {!form.academicYearId && (
               <p className="text-xs text-destructive">Akademik yil tanlanishi shart</p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="track-select">Yo'nalish (ixtiyoriy)</Label>
+            <Select
+              value={form.trackId || 'none'}
+              onValueChange={(value) => setForm({ ...form, trackId: value === 'none' ? '' : value })}
+            >
+              <SelectTrigger id="track-select">
+                <SelectValue placeholder="Yo'nalish tanlang..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Yo'nalishsiz —</SelectItem>
+                {tracks.map((t: any) => (
+                  <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex flex-col-reverse justify-end gap-2 mt-8 sm:flex-row pt-4 border-t">

@@ -95,9 +95,13 @@ const navGroups: NavItem[] = [
 
 export function StaffSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [openGroups, setOpenGroups] = useState<string[]>(['Akademik', "O'quvchilar"]);
-  const [logoutOpen, setLogoutOpen] = useState(false);
   const location = useLocation();
+  const [openGroups, setOpenGroups] = useState<string[]>(() =>
+    navGroups
+      .filter(item => item.children?.some(c => location.pathname.startsWith(c.path)))
+      .map(item => item.label)
+  );
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();

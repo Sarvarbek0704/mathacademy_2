@@ -85,12 +85,15 @@ export default function AcademicYearsPage() {
     {
       key: 'isCurrent',
       title: 'Holat',
-      render: (i) =>
-        i.isCurrent ? (
-          <StatusBadge status="ACTIVE" label="Joriy" />
-        ) : (
-          <StatusBadge status="CLOSED" label="Tugagan" />
-        ),
+      render: (i) => {
+        if (i.isCurrent) return <StatusBadge status="ACTIVE" label="Joriy" />;
+        const today = new Date();
+        const end = i.endDate ? new Date(i.endDate) : null;
+        const start = i.startDate ? new Date(i.startDate) : null;
+        if (end && end < today) return <StatusBadge status="CLOSED" label="Tugagan" />;
+        if (start && start > today) return <StatusBadge status="PENDING" label="Kelasi" />;
+        return <StatusBadge status="INACTIVE" label="Nofaol" />;
+      },
     },
   ];
 
