@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -25,12 +25,12 @@ export default function RankingPage() {
   const { data: groupsRes } = useQuery({
     queryKey: ['staff', 'groups', 'list'],
     queryFn: async () => (await api.get('/staff/groups?limit=100')).data,
-    onSuccess: (data) => {
-      if (data.data?.length > 0 && !groupId) {
-        setGroupId(data.data[0].id);
-      }
-    }
   });
+
+  useEffect(() => {
+    const firstGroup = groupsRes?.data?.[0];
+    if (firstGroup && !groupId) setGroupId(firstGroup.id);
+  }, [groupsRes]);
 
   // Fetch Live Ranking
   const { data: liveRes, isLoading: isLiveLoading, refetch: refetchLive } = useQuery({
@@ -82,7 +82,25 @@ export default function RankingPage() {
   const rankingColumns: Column<any>[] = [
     { key: 'rank', title: '#', render: (item) => <span className="font-bold text-lg">{item.rank ?? '-'}</span> },
     { key: 'studentName', title: "O'quvchi", render: (i) => <span className="font-semibold">{i.studentName}</span> },
-    { key: 'totalScore', title: 'Umumiy ball', render: (i) => <span className="font-mono font-bold text-primary">{i.totalScore ?? '0.00'}</span> },
+    {
+      key: 'scores',
+      title: "Baholash natijalari",
+      render: (i) => {
+        if (i.scores && typeof i.scores === 'object') {
+          return (
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(i.scores).map(([subject, score]: [string, any]) => (
+                <span key={subject} className="text-[11px] bg-primary/10 text-primary font-mono px-1.5 py-0.5 rounded">
+                  {subject}: {typeof score === 'number' ? score.toFixed(1) : score}
+                </span>
+              ))}
+            </div>
+          );
+        }
+        return <span className="font-mono font-bold text-primary">{i.totalScore ?? '0.00'}</span>;
+      },
+    },
+    { key: 'attendanceRate', title: 'Davomat', render: (i) => i.attendanceRate != null ? <span className="font-mono text-sm">{Number(i.attendanceRate).toFixed(0)}%</span> : <span className="text-muted-foreground">—</span> },
     { key: 'riskLevel', title: 'Risk holati', render: (i) => <StatusBadge status={i.riskLevel || 'GREEN'} /> },
   ];
 

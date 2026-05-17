@@ -33,6 +33,18 @@ import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function lessonHeightPx(startsAt: string, endsAt: string, slotHeightPx = 80): number {
+  if (!startsAt || !endsAt) return slotHeightPx;
+  const duration = timeToMinutes(endsAt) - timeToMinutes(startsAt);
+  if (duration <= 0) return slotHeightPx;
+  return Math.max(slotHeightPx * (duration / 60), 48);
+}
+
 const WEEKDAYS = [
   { value: 'MONDAY', label: 'Dushanba' },
   { value: 'TUESDAY', label: 'Seshanba' },
@@ -404,7 +416,8 @@ export default function TimetablePage() {
                             {lessons.map((lesson: any) => (
                               <div
                                 key={lesson.id}
-                                className="mb-1 rounded-md border p-2 text-xs bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all cursor-pointer group/lesson relative"
+                                style={{ height: lessonHeightPx(lesson.startsAt, lesson.endsAt) }}
+                                className="mb-1 rounded-md border p-2 text-xs bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all cursor-pointer group/lesson relative overflow-hidden"
                                 onClick={() => {
                                   setSelectedSlot(lesson);
                                   setForm({
