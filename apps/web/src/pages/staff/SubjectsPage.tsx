@@ -15,7 +15,6 @@ import {
   Search,
   Loader2,
   Code,
-  Layers,
   GraduationCap,
   Route,
 } from 'lucide-react';
@@ -153,10 +152,25 @@ export default function SubjectsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5 pt-0 flex-1 flex flex-col justify-end">
-                  <div className="pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
+                  {/* Show tracks this subject belongs to */}
+                  {subject.tracks && subject.tracks.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {subject.tracks.map((t: any) => (
+                        <Badge
+                          key={t.id}
+                          variant="secondary"
+                          className="text-[9px] px-1.5 h-4"
+                          style={t.color ? { backgroundColor: `${t.color}22`, color: t.color, borderColor: `${t.color}55` } : undefined}
+                        >
+                          {t.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-primary" />
-                      <span>{subject.groupsCount ?? subject.groupCount ?? 0} guruh</span>
+                      <Route className="h-3.5 w-3.5 text-primary" />
+                      <span>{subject.tracks?.length ?? 0} yo'nalish</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <GraduationCap className="h-3.5 w-3.5 text-primary" />

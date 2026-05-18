@@ -52,7 +52,7 @@ export function Breadcrumbs() {
 
   return (
     <nav className="flex mb-4" aria-label="Breadcrumb">
-      <ol className="flex items-center space-x-1 md:space-x-2">
+      <ol className="flex flex-wrap items-center gap-y-1 space-x-1 md:space-x-2">
         <li className="inline-flex items-center">
           <Link
             to="/staff/dashboard"

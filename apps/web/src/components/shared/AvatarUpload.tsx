@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Camera, Loader2, User } from 'lucide-react';
+import { Camera, Loader2, User, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
@@ -14,12 +14,14 @@ function resolveUrl(url?: string | null): string | null {
 
 interface AvatarUploadProps {
   currentUrl?: string | null;
-  ownerType: 'STUDENT' | 'TEACHER' | 'USER';
+  ownerType: 'STUDENT' | 'USER' | 'GUARDIAN' | 'EVENT' | 'COMPETITION' | 'AWARD' | 'OTHER';
   ownerId: string;
   purpose?: string;
   onUploaded?: (url: string) => void;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /** Show an image/landscape icon instead of person silhouette (for events, banners) */
+  variant?: 'avatar' | 'banner';
 }
 
 export function AvatarUpload({
@@ -30,15 +32,17 @@ export function AvatarUpload({
   onUploaded,
   size = 'md',
   className,
+  variant = 'avatar',
 }: AvatarUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(resolveUrl(currentUrl));
 
+  const isRound = variant !== 'banner';
   const sizeClasses = {
-    sm: 'h-10 w-10',
-    md: 'h-16 w-16',
-    lg: 'h-24 w-24',
+    sm: isRound ? 'h-10 w-10' : 'h-10 w-20',
+    md: isRound ? 'h-16 w-16' : 'h-16 w-32',
+    lg: isRound ? 'h-24 w-24' : 'h-20 w-40',
   };
   const iconSizes = { sm: 'h-5 w-5', md: 'h-8 w-8', lg: 'h-12 w-12' };
   const cameraSize = { sm: 'h-3 w-3', md: 'h-4 w-4', lg: 'h-5 w-5' };
@@ -95,7 +99,8 @@ export function AvatarUpload({
     <div className={cn('relative inline-block', className)}>
       <div
         className={cn(
-          'rounded-full overflow-hidden border-2 border-border bg-muted flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity',
+          'overflow-hidden border-2 border-border bg-muted flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity',
+          isRound ? 'rounded-full' : 'rounded-lg',
           sizeClasses[size],
         )}
         onClick={() => !uploading && inputRef.current?.click()}
@@ -103,6 +108,8 @@ export function AvatarUpload({
       >
         {previewUrl ? (
           <img src={previewUrl} alt="Avatar" className="h-full w-full object-cover" />
+        ) : variant === 'banner' ? (
+          <ImageIcon className={cn('text-muted-foreground', iconSizes[size])} />
         ) : (
           <User className={cn('text-muted-foreground', iconSizes[size])} />
         )}
@@ -118,6 +125,7 @@ export function AvatarUpload({
         className={cn(
           'absolute rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer shadow-sm hover:bg-primary/90 transition-colors',
           badgeSize[size],
+          isRound ? '' : '-bottom-1 -right-1',
         )}
         onClick={() => !uploading && inputRef.current?.click()}
       >

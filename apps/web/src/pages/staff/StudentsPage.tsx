@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SlideOver } from '@/components/shared/SlideOver';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -51,7 +51,9 @@ function getDisplayName(student: any): string {
 
 export default function StudentsPage() {
   const navigate = useNavigate();
-  const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlGroupId = searchParams.get('groupId') || '';
+  const [selectedGroup, setSelectedGroup] = useState<string>(urlGroupId || 'all');
 
   const {
     data: students,
@@ -94,6 +96,12 @@ export default function StudentsPage() {
     };
     fetchGroups();
   }, []);
+
+  // Sync URL → state when navigating from GroupsPage
+  useEffect(() => {
+    const gid = searchParams.get('groupId') || '';
+    setSelectedGroup(gid || 'all');
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch when group filter changes
   useEffect(() => {
@@ -240,7 +248,17 @@ export default function StudentsPage() {
 
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+          <Select
+            value={selectedGroup}
+            onValueChange={(v) => {
+              setSelectedGroup(v);
+              if (v && v !== 'all') {
+                setSearchParams({ groupId: v });
+              } else {
+                setSearchParams({});
+              }
+            }}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Guruhni tanlang..." />
             </SelectTrigger>

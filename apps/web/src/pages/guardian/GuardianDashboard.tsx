@@ -284,7 +284,7 @@ export default function GuardianDashboard() {
 
   const { data: invoicesRes } = useQuery<GuardianInvoicesResponse>({
     queryKey: ['guardian', 'student', 'invoices'],
-    queryFn: async () => (await api.get('/guardian/student/invoices')).data,
+    queryFn: async () => (await api.get('/guardian/billing/invoices')).data,
   });
 
   const { data: timetableRes } = useQuery<GuardianTimetableResponse>({
@@ -416,8 +416,10 @@ export default function GuardianDashboard() {
   const hasRankingData = Boolean(rankingRes?.hasData && ranking);
 
   const invoices = Array.isArray(invoicesRes?.invoices) ? invoicesRes.invoices : [];
-  const invoiceTotals = invoicesRes?.totals ?? {};
-  const totalPending = toNumber(invoiceTotals.totalPending);
+  const invoiceSummary = invoicesRes?.summary ?? invoicesRes?.totals ?? {};
+  const totalPending = toNumber(
+    invoiceSummary.totalRemaining ?? invoiceSummary.totalPending ?? invoiceSummary.pending,
+  );
   const pendingInvoices = invoices.filter(
     (invoice) => toNumber(invoice?.remainingAmount ?? invoice?.pendingAmount) > 0,
   );

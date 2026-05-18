@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"D:\\\\lovable_academy\\\\mathacademy_2\\\\.claude\\\\worktrees\\\\nice-gates-55a350\" -Recurse -Force | Select-Object -Property FullName | ForEach-Object { $_.FullName } | Sort-Object)",
+      "Bash(Get-ChildItem -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"D:\\\\lovable_academy\\\\mathacademy_2\\\\.claude\\\\worktrees\\\\nice-gates-55a350\\\\apps\\\\api\\\\src\" -Recurse -File -Name)",
+      "PowerShell(head -80)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'fix: comprehensive bug fixes, UX improvements and performance optimizations' --body ' *)",
+      "Read(//d/lovable_academy/mathacademy_2/**)",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\lovable_academy\\\\mathacademy_2\\\\apps\\\\api\\\\src\\\\staff\" -Recurse)",
+      "Bash(Select-Object -First 50)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "PowerShell(Set-Location \"D:\\\\lovable_academy\\\\mathacademy_2\"; Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"Set-Location 'D:\\\\lovable_academy\\\\mathacademy_2'; pnpm --filter api dev 2>&1\" -WindowStyle Normal; Write-Host \"Backend started\")",
+      "Bash(pnpm --filter api dev)",
+      "Bash(echo \"API PID: $!\")",
+      "Bash(pnpm --filter web dev)",
+      "Bash(echo \"Web PID: $!\")",
+      "Read(//tmp/**)",
+      "PowerShell($env:PATH; Write-Host \"---\"; Get-ChildItem \"$env:APPDATA\\\\npm\\\\pnpm.cmd\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\pnpm.cmd\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\pnpm\\\\pnpm.cmd\" -ErrorAction SilentlyContinue)",
+      "PowerShell($env:Path += \";C:\\\\Users\\\\VICTUS\\\\AppData\\\\Roaming\\\\npm\"; Get-Command pnpm -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)",
+      "Bash(netstat -ano)",
+      "Bash(sed -n '955,975p' \"D:/lovable_academy/mathacademy_2/apps/api/prisma/schema.prisma\")",
+      "Bash(sed -n '1060,1095p' \"D:/lovable_academy/mathacademy_2/apps/api/prisma/schema.prisma\")",
+      "PowerShell(Start-Sleep -Seconds 15; \\(Get-Content \"C:\\\\Users\\\\VICTUS\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--lovable-academy-mathacademy-2--claude-worktrees-nice-gates-55a350\\\\445a10b8-9036-4480-a8a1-a012b0d6b91a\\\\tasks\\\\b6muq11o7.output\"\\) | Select-Object -Last 20)",
+      "Bash(Get-ChildItem -Path \"D:\\\\lovable_academy\\\\mathacademy_2\\\\apps\\\\api\\\\src\\\\modules\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"D:\\\\lovable_academy\\\\mathacademy_2\" -Filter \"*billing*\" -Recurse -File)"
+    ]
+  }
+}

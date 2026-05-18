@@ -30,6 +30,7 @@ import RolesPage from './pages/staff/RolesPage';
 import TimetablePage from './pages/staff/TimetablePage';
 import StaffAnnouncementsPage from './pages/staff/StaffAnnouncementsPage';
 import AwardsPage from './pages/staff/AwardsPage';
+import BillingPage from './pages/staff/BillingPage';
 import MealBillingPage from './pages/staff/MealBillingPage';
 import DormBillingPage from './pages/staff/DormBillingPage';
 import DisplaysPage from './pages/staff/DisplaysPage';
@@ -111,6 +112,7 @@ const App = () => (
                 <Route path="displays" element={<DisplaysPage />} />
                 <Route path="dorms" element={<DormsPage />} />
                 <Route path="campuses" element={<CampusesPage />} />
+                <Route path="billing" element={<BillingPage />} />
                 <Route path="meal-billing" element={<MealBillingPage />} />
                 <Route path="dorm-billing" element={<DormBillingPage />} />
                 <Route path="reports" element={<ReportsPage />} />

@@ -32,7 +32,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardFooter,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -242,7 +241,7 @@ export default function GroupsPage() {
                   </div>
                   <div className="mt-4">
                     <CardTitle className="text-xl font-black">{group.name}</CardTitle>
-                    <CardDescription className="flex flex-wrap items-center gap-2 mt-1">
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
                       <Badge
                         variant="secondary"
                         className="text-[10px] uppercase font-bold tracking-wider px-2 py-0"
@@ -261,7 +260,7 @@ export default function GroupsPage() {
                       <span className="text-[10px] font-mono text-muted-foreground">
                         {group.academicYear?.name}
                       </span>
-                    </CardDescription>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-5 flex-1 flex flex-col justify-end">

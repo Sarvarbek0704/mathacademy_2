@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { StaffSidebar } from './StaffSidebar';
 import { Breadcrumbs } from '../shared/Breadcrumbs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export function StaffLayout() {
   const { user, loading } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   if (loading) {
     return (
@@ -21,11 +24,33 @@ export function StaffLayout() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <StaffSidebar />
-      <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-6 max-w-[1440px] mx-auto">
-          <Breadcrumbs />
-          <Outlet />
+      <StaffSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+
+      <main className="flex-1 overflow-y-auto bg-background flex flex-col min-w-0">
+        {/* Mobile top header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b bg-background lg:hidden shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileOpen(true)}
+            className="h-9 w-9"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs">
+              M
+            </div>
+            <span className="font-bold text-sm">MathAcademy</span>
+          </div>
+        </div>
+
+        {/* Page content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 max-w-[1440px] mx-auto">
+            <Breadcrumbs />
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
