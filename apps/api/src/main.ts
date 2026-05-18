@@ -39,6 +39,14 @@ function isLocalDevOrigin(origin: string): boolean {
   }
 }
 
+function matchesWildcard(origin: string, patterns: string[]): boolean {
+  return patterns.some((p) => {
+    if (!p.includes('*')) return false;
+    const regex = new RegExp('^' + p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+    return regex.test(origin);
+  });
+}
+
 async function bootstrap() {
   patchBigIntJson();
 
@@ -61,15 +69,17 @@ async function bootstrap() {
   app.use(cookieParser());
 
   const frontendPort = Number(process.env.WEB_PORT) || 3000;
-  const allowList = [
+  const parsedOrigins = parseOrigins(process.env.WEB_ORIGINS);
+  const exactOrigins = parsedOrigins.filter((o) => !o.includes('*'));
+  const wildcardOrigins = parsedOrigins.filter((o) => o.includes('*'));
+
+  const allowSet = new Set([
     `http://localhost:${frontendPort}`,
     `http://127.0.0.1:${frontendPort}`,
     `http://localhost:${port}`,
     `http://127.0.0.1:${port}`,
-    ...parseOrigins(process.env.WEB_ORIGINS),
-  ];
-
-  const allowSet = new Set(allowList);
+    ...exactOrigins,
+  ]);
   const isProduction = process.env.NODE_ENV === 'production';
 
   app.enableCors({
@@ -79,6 +89,9 @@ async function bootstrap() {
 
       // Explicitly allowed origins from env/defaults
       if (allowSet.has(origin)) return callback(null, true);
+
+      // Wildcard pattern matches (e.g. https://*.vercel.app)
+      if (matchesWildcard(origin, wildcardOrigins)) return callback(null, true);
 
       // Development convenience: allow localhost/127.0.0.1 with any port
       if (!isProduction && isLocalDevOrigin(origin))
