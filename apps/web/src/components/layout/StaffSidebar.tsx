@@ -10,7 +10,7 @@ import {
   LogOut, Sun, Moon, PanelLeftClose, PanelLeft, BarChart3, AlertTriangle,
   UserCheck, FileText, Award, Flag, Clock, Home, Layers, Route, UsersRound,
   BookMarked, Scale, Receipt, Utensils, BedDouble, Megaphone, FolderOpen,
-  ScrollText, Settings, ChevronLeft
+  ScrollText, Settings, X,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -55,15 +55,16 @@ const navGroups: NavItem[] = [
   {
     label: 'Intizom', icon: Shield,
     children: [
-      { label: 'Qoidabuzarliklar', path: '/staff/violations', icon: Flag, permission: 'violations.read' },
-      { label: 'Jazolar', path: '/staff/discipline-actions', icon: Scale, permission: 'discipline_actions.read' },
+      { label: 'Qoidabuzarliklar', path: '/staff/violations', icon: Flag, permission: 'discipline.read' },
+      { label: 'Jazolar', path: '/staff/discipline-actions', icon: Scale, permission: 'discipline.read' },
     ],
   },
   {
     label: 'Moliya', icon: DollarSign,
     children: [
-      { label: "To'lovlar", path: '/staff/payments', icon: Receipt, permission: 'payments.read' },
-      { label: 'Hisob-fakturalar', path: '/staff/invoices', icon: FileText, permission: 'invoices.read' },
+      { label: 'Billing', path: '/staff/billing', icon: DollarSign, permission: 'billing.read' },
+      { label: "To'lovlar", path: '/staff/payments', icon: Receipt, permission: 'billing.read' },
+      { label: 'Hisob-fakturalar', path: '/staff/invoices', icon: FileText, permission: 'billing.read' },
       { label: 'Ovqat billing', path: '/staff/meal-billing', icon: Utensils, permission: 'billing.read' },
       { label: 'Yotoqxona billing', path: '/staff/dorm-billing', icon: BedDouble, permission: 'billing.read' },
     ],
@@ -77,12 +78,12 @@ const navGroups: NavItem[] = [
       { label: 'Sertifikatlar', path: '/staff/certificates', icon: ScrollText, permission: 'certificates.read' },
     ],
   },
-  { label: 'Hisobotlar', icon: BarChart3, path: '/staff/reports', permission: 'reports.read' },
+  { label: 'Hisobotlar', icon: BarChart3, path: '/staff/reports' },
   {
     label: 'Tizim', icon: Settings,
     children: [
-      { label: 'Foydalanuvchilar', path: '/staff/users', icon: Users, permission: 'users.read' },
-      { label: 'Rollar', path: '/staff/roles', icon: Shield, permission: 'roles.read' },
+      { label: 'Foydalanuvchilar', path: '/staff/users', icon: Users, permission: 'users.view' },
+      { label: 'Rollar', path: '/staff/roles', icon: Shield, permission: 'roles.view' },
       { label: "E'lonlar", path: '/staff/announcements', icon: Megaphone, permission: 'announcements.read' },
       { label: 'Bildirishnomalar', path: '/staff/notifications', icon: Bell, permission: 'notifications.read' },
       { label: 'Monitorlar', path: '/staff/displays', icon: Monitor, permission: 'displays.read' },
@@ -93,14 +94,20 @@ const navGroups: NavItem[] = [
   },
 ];
 
-export function StaffSidebar() {
+interface StaffSidebarProps {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export function StaffSidebar({ mobileOpen, onMobileClose }: StaffSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const [openGroups, setOpenGroups] = useState<string[]>(() =>
-    navGroups
-      .filter(item => item.children?.some(c => location.pathname.startsWith(c.path)))
-      .map(item => item.label)
-  );
+  const [openGroups, setOpenGroups] = useState<string[]>(() => {
+    const active = navGroups.find(item =>
+      item.children?.some(c => location.pathname.startsWith(c.path))
+    );
+    return active ? [active.label] : [];
+  });
   const [logoutOpen, setLogoutOpen] = useState(false);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -116,17 +123,13 @@ export function StaffSidebar() {
 
   const filteredNavGroups = navGroups.map(item => {
     const filteredChildren = item.children?.filter(child => hasPermission(child.permission));
-    
     if (item.path && !hasPermission(item.permission)) return null;
     if (item.children && filteredChildren?.length === 0) return null;
-
     return { ...item, children: filteredChildren };
   }).filter(Boolean) as NavItem[];
 
   const toggleGroup = (label: string) => {
-    setOpenGroups(prev =>
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-    );
+    setOpenGroups(prev => prev.includes(label) ? [] : [label]);
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -138,29 +141,61 @@ export function StaffSidebar() {
     navigate('/staff/login');
   };
 
+  const handleNavClick = () => {
+    if (mobileOpen) onMobileClose();
+  };
+
   return (
     <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+
       <aside className={cn(
         "flex flex-col h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 shrink-0",
-        collapsed ? "w-[68px]" : "w-[260px]"
+        // Mobile: fixed overlay; Desktop: relative in flex flow
+        "fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto",
+        // Mobile slide behavior; Desktop always visible
+        mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0",
+        // Width: mobile always 260px; desktop respects collapsed state
+        "w-[260px]",
+        collapsed && "lg:w-[68px]",
       )}>
         {/* Logo */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          {!collapsed && (
-            <Link to="/staff/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm">
-                M
-              </div>
-              <span className="font-bold text-sm">MathAcademy</span>
-            </Link>
-          )}
+          <Link
+            to="/staff/dashboard"
+            onClick={handleNavClick}
+            className={cn("flex items-center gap-2", collapsed && "lg:hidden")}
+          >
+            <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm shrink-0">
+              M
+            </div>
+            <span className="font-bold text-sm">MathAcademy</span>
+          </Link>
+
+          {/* Desktop: collapse toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8"
+            className="hidden lg:flex text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8 shrink-0"
           >
             {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
+
+          {/* Mobile: close button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMobileClose}
+            className="lg:hidden text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8 shrink-0"
+          >
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
@@ -172,6 +207,7 @@ export function StaffSidebar() {
                 <Link
                   key={item.label}
                   to={item.path}
+                  onClick={handleNavClick}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive(item.path)
@@ -180,8 +216,8 @@ export function StaffSidebar() {
                   )}
                   title={collapsed ? item.label : undefined}
                 >
-                  <item.icon className="h-4.5 w-4.5 shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className={cn("truncate", collapsed && "lg:hidden")}>{item.label}</span>
                 </Link>
               );
             }
@@ -192,7 +228,7 @@ export function StaffSidebar() {
             return (
               <div key={item.label}>
                 <button
-                  onClick={() => !collapsed && toggleGroup(item.label)}
+                  onClick={() => toggleGroup(item.label)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors w-full",
                     groupActive
@@ -201,20 +237,28 @@ export function StaffSidebar() {
                   )}
                   title={collapsed ? item.label : undefined}
                 >
-                  <item.icon className="h-4.5 w-4.5 shrink-0" />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {groupOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    </>
-                  )}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className={cn("flex-1 text-left truncate", collapsed && "lg:hidden")}>
+                    {item.label}
+                  </span>
+                  <span className={cn(collapsed && "lg:hidden")}>
+                    {groupOpen
+                      ? <ChevronDown className="h-3.5 w-3.5" />
+                      : <ChevronRight className="h-3.5 w-3.5" />
+                    }
+                  </span>
                 </button>
-                {!collapsed && groupOpen && item.children && (
-                  <div className="ml-4 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5 mb-1">
+
+                {groupOpen && item.children && (
+                  <div className={cn(
+                    "ml-4 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5 mb-1",
+                    collapsed && "lg:hidden",
+                  )}>
                     {item.children.map(child => (
                       <Link
                         key={child.path}
                         to={child.path}
+                        onClick={handleNavClick}
                         className={cn(
                           "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors",
                           isActive(child.path)
@@ -240,28 +284,28 @@ export function StaffSidebar() {
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent w-full transition-colors"
             title={theme === 'dark' ? 'Kunduzgi rejim' : 'Tungi rejim'}
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {!collapsed && <span>{theme === 'dark' ? 'Kunduzgi rejim' : 'Tungi rejim'}</span>}
+            {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+            <span className={cn(collapsed && "lg:hidden")}>
+              {theme === 'dark' ? 'Kunduzgi rejim' : 'Tungi rejim'}
+            </span>
           </button>
 
           <div className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2",
-            collapsed ? "justify-center" : ""
+            collapsed && "lg:justify-center",
           )}>
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-8 w-8 shrink-0">
               <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
                 {staffUser?.fullName?.charAt(0) || staffUser?.username?.charAt(0) || 'S'}
               </AvatarFallback>
             </Avatar>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{staffUser?.fullName || staffUser?.username}</p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">{staffUser?.roles?.join(', ')}</p>
-              </div>
-            )}
+            <div className={cn("flex-1 min-w-0", collapsed && "lg:hidden")}>
+              <p className="text-sm font-medium truncate">{staffUser?.fullName || staffUser?.username}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{staffUser?.roles?.join(', ')}</p>
+            </div>
             <button
               onClick={() => setLogoutOpen(true)}
-              className="text-sidebar-foreground/60 hover:text-destructive transition-colors"
+              className="text-sidebar-foreground/60 hover:text-destructive transition-colors shrink-0"
               title="Chiqish"
             >
               <LogOut className="h-4 w-4" />

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Plus, UserCheck, Loader2, Search, Check, X, ShieldAlert, AlertCircle, Save } from 'lucide-react';
+import { Pencil, Plus, UserCheck, Loader2, Search, Check, X, ShieldAlert, AlertCircle, Save, CalendarX, Ban } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +60,7 @@ export default function AttendancePage() {
   const [searchStudent, setSearchStudent] = useState('');
   
   const [form, setForm] = useState({ type: 'CLASS', sessionDate: '', groupId: '', note: '' });
+  const [selectedPeriodNo, setSelectedPeriodNo] = useState<number | null>(null);
 
   // Groups for session creation
   const { data: groupsRes } = useQuery({
@@ -67,6 +68,11 @@ export default function AttendancePage() {
     queryFn: async () => (await api.get('/staff/groups?limit=100')).data,
   });
   const groupsList = groupsRes?.data || [];
+
+  // Future date check
+  const isFutureDate = form.sessionDate
+    ? new Date(form.sessionDate) > new Date(new Date().toDateString())
+    : false;
 
   // Timetable lessons for selected group+date
   const selectedDayOfWeek = form.sessionDate
@@ -83,6 +89,37 @@ export default function AttendancePage() {
   const todayLessons: any[] = (activeTimetable?.lessons || []).filter(
     (l: any) => l.dayOfWeek === selectedDayOfWeek,
   );
+
+  // Events on selected date (for EVENT type validation)
+  const { data: eventsOnDateRes } = useQuery({
+    queryKey: ['staff', 'events', 'for-date', form.sessionDate],
+    queryFn: async () => {
+      const from = `${form.sessionDate}T00:00:00`;
+      const to = `${form.sessionDate}T23:59:59`;
+      return (await api.get(`/staff/events?from=${from}&to=${to}&limit=20`)).data;
+    },
+    enabled: !!form.sessionDate,
+  });
+  const eventsToday: any[] = eventsOnDateRes?.data || [];
+
+  // Availability checks
+  const classAvailable = todayLessons.length > 0;
+  const eventAvailable = eventsToday.length > 0;
+
+  const typeBlockReason: string | null =
+    isFutureDate
+      ? "Kelajak sanasi uchun davomat olish mumkin emas"
+      : form.type === 'CLASS' && form.groupId && form.sessionDate && !classAvailable
+      ? 'Bu kunda ushbu guruh uchun dars rejalashtirilmagan'
+      : form.type === 'EVENT' && form.sessionDate && !eventAvailable
+      ? 'Bu kunda hech qanday tadbir rejalashtirilmagan'
+      : null;
+
+  const canCreate =
+    !!form.groupId &&
+    !!form.sessionDate &&
+    !typeBlockReason &&
+    (form.type !== 'CLASS' || selectedPeriodNo !== null);
 
   // Session details for marking
   const { data: sessionDetail, isLoading: loadingMarks } = useQuery<AttendanceSessionDetail>({
@@ -138,7 +175,16 @@ export default function AttendancePage() {
 
   const columns: Column<any>[] = [
     { key: 'sessionDate', title: 'Sana', render: (i) => i.sessionDate || i.session_date ? new Date(i.sessionDate || i.session_date).toLocaleDateString('uz') : '-' },
-    { key: 'type', title: 'Turi', render: (i) => <StatusBadge status="ACTIVE" label={i.type === 'CLASS' ? 'Dars' : i.type === 'STUDY_HALL' ? 'O\'qish zali' : 'Tadbir'} /> },
+    {
+      key: 'type', title: 'Turi', render: (i) => (
+        <div className="flex flex-col gap-0.5">
+          <StatusBadge status="ACTIVE" label={i.type === 'CLASS' ? 'Dars' : i.type === 'STUDY_HALL' ? "O'qish zali" : 'Tadbir'} />
+          {i.type === 'CLASS' && i.periodNo > 0 && (
+            <span className="text-[10px] text-muted-foreground">{i.periodNo}-dars</span>
+          )}
+        </div>
+      )
+    },
     { key: 'group', title: 'Guruh', render: (i) => i.group?.name || '-' },
     { 
       key: 'statistics', title: 'Statistika', 
@@ -154,7 +200,7 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Davomat boshqaruvi" description="Dars va tadbirlar uchun davomatlarni belgilang" action={{ label: 'Yangi sessiya', onClick: () => { setForm({ type: 'CLASS', sessionDate: new Date().toISOString().split('T')[0], groupId: '', note: '' }); setModalOpen(true); } }} />
+      <PageHeader title="Davomat boshqaruvi" description="Dars va tadbirlar uchun davomatlarni belgilang" action={{ label: 'Yangi sessiya', onClick: () => { setForm({ type: 'CLASS', sessionDate: new Date().toISOString().split('T')[0], groupId: '', note: '' }); setSelectedPeriodNo(null); setModalOpen(true); } }} />
       
       <DataTable 
         columns={columns} data={data} loading={loading} searchable onSearch={setSearch}
@@ -189,55 +235,127 @@ export default function AttendancePage() {
             </Select>
           </div>
 
-          {/* Scheduled lessons for this day */}
-          {form.groupId && form.sessionDate && (
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+          {/* Type selector with availability badges */}
+          <div className="space-y-2">
+            <Label>Sessiya turi</Label>
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                {
+                  value: 'CLASS',
+                  label: 'Dars',
+                  desc: classAvailable
+                    ? `${todayLessons.length} ta dars rejalashtirilgan`
+                    : form.groupId && form.sessionDate
+                    ? 'Bu kunda dars rejalashtirilmagan'
+                    : 'Guruh va sana tanlang',
+                  available: !form.groupId || !form.sessionDate || classAvailable,
+                },
+                {
+                  value: 'STUDY_HALL',
+                  label: "O'qish zali",
+                  desc: 'Har doim ruxsat etilgan',
+                  available: true,
+                },
+                {
+                  value: 'EVENT',
+                  label: 'Tadbir',
+                  desc: eventAvailable
+                    ? `${eventsToday.length} ta tadbir rejalashtirilgan`
+                    : form.sessionDate
+                    ? 'Bu kunda tadbir rejalashtirilmagan'
+                    : 'Sana tanlang',
+                  available: !form.sessionDate || eventAvailable,
+                },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={!opt.available}
+                  onClick={() => { if (opt.available) { setForm({ ...form, type: opt.value }); setSelectedPeriodNo(null); } }}
+                  className={cn(
+                    'flex items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-all',
+                    form.type === opt.value
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : opt.available
+                      ? 'border-border bg-card hover:bg-muted/40 cursor-pointer'
+                      : 'border-border bg-muted/20 opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <div>
+                    <p className="font-semibold">{opt.label}</p>
+                    <p className={cn('text-[11px] mt-0.5', opt.available ? 'text-muted-foreground' : 'text-destructive/70')}>
+                      {opt.desc}
+                    </p>
+                  </div>
+                  {form.type === opt.value ? (
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  ) : !opt.available ? (
+                    <Ban className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Lesson selector for CLASS type */}
+          {form.type === 'CLASS' && form.groupId && form.sessionDate && !isFutureDate && todayLessons.length > 0 && (
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-1.5">
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                Bugungi jadval darslar
+                Qaysi dars uchun davomat? *
               </p>
-              {todayLessons.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Bu kunda rejalashtirilgan dars yo'q
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {todayLessons.map((l: any) => (
-                    <div
-                      key={l.id}
-                      className="flex items-center justify-between text-xs bg-background border rounded px-2 py-1.5"
-                    >
-                      <div>
-                        <span className="font-medium">{l.subject?.name || 'Fan'}</span>
-                        <span className="text-muted-foreground ml-2">
-                          {l.startsAt}–{l.endsAt}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[10px] px-2"
-                        onClick={() => setForm({ ...form, type: 'CLASS', note: `${l.subject?.name || 'Fan'} darsi` })}
-                      >
-                        Tanlash
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+              {todayLessons.map((l: any) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setSelectedPeriodNo(selectedPeriodNo === l.periodNo ? null : l.periodNo)}
+                  className={cn(
+                    'w-full flex items-center justify-between text-xs border rounded px-2.5 py-2 text-left transition-all',
+                    selectedPeriodNo === l.periodNo
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'bg-background hover:bg-muted/40 cursor-pointer',
+                  )}
+                >
+                  <div>
+                    <span className="font-semibold">{l.periodNo}-dars • {l.subject?.name || 'Fan'}</span>
+                    <span className="text-muted-foreground ml-2">{l.startsAt}–{l.endsAt}</span>
+                  </div>
+                  {selectedPeriodNo === l.periodNo && (
+                    <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                  )}
+                </button>
+              ))}
+              {selectedPeriodNo === null && (
+                <p className="text-[10px] text-orange-500">Darsni tanlang</p>
               )}
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Turi</Label>
-            <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CLASS">Dars</SelectItem>
-                <SelectItem value="STUDY_HALL">O'qish zali</SelectItem>
-                <SelectItem value="EVENT">Tadbir</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Events detail */}
+          {form.type === 'EVENT' && form.sessionDate && eventsToday.length > 0 && (
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-1.5">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Bugungi tadbirlar
+              </p>
+              {eventsToday.map((e: any) => (
+                <div key={e.id} className="text-xs bg-background border rounded px-2 py-1.5">
+                  <span className="font-medium">{e.title}</span>
+                  {e.startsAt && (
+                    <span className="text-muted-foreground ml-2">
+                      {new Date(e.startsAt).toLocaleTimeString('uz', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Block reason warning */}
+          {typeBlockReason && (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+              <CalendarX className="h-4 w-4 shrink-0" />
+              {typeBlockReason}
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Izoh (Ixtiyoriy)</Label>
             <Textarea
@@ -252,7 +370,19 @@ export default function AttendancePage() {
           <Button variant="outline" className="w-full sm:w-auto" onClick={() => setModalOpen(false)}>
             Bekor qilish
           </Button>
-          <Button className="w-full sm:w-auto" onClick={async () => { await create(form); setModalOpen(false); }}>
+          <Button
+            className="w-full sm:w-auto"
+            disabled={!canCreate}
+            onClick={async () => {
+              const payload: any = { ...form };
+              if (form.type === 'CLASS' && selectedPeriodNo !== null) {
+                payload.periodNo = selectedPeriodNo;
+              }
+              await create(payload);
+              setSelectedPeriodNo(null);
+              setModalOpen(false);
+            }}
+          >
             Yaratish
           </Button>
         </div>

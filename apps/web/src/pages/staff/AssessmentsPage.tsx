@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable, type Column } from '@/components/shared/DataTable';
 import { SlideOver } from '@/components/shared/SlideOver';
@@ -48,10 +48,28 @@ interface AssessmentScoreRow {
 interface AssessmentDetail {
   id: string;
   title: string;
+  type: string;
   maxScore: number;
   isPublished: boolean;
-  group: { id: string; name: string };
+  group: { id: string; name: string; trackId?: string };
   scores: AssessmentScoreRow[];
+}
+
+interface BlockRow {
+  main: string;
+  secondary: string;
+  m1: string;
+  m2: string;
+  m3: string;
+}
+
+function calcDtmTotal(b: BlockRow): number {
+  const main = parseFloat(b.main) || 0;
+  const secondary = parseFloat(b.secondary) || 0;
+  const m1 = parseFloat(b.m1) || 0;
+  const m2 = parseFloat(b.m2) || 0;
+  const m3 = parseFloat(b.m3) || 0;
+  return Math.round((main * 3.1 + secondary * 2.1 + (m1 + m2 + m3) * 1.1) * 10) / 10;
 }
 
 export default function AssessmentsPage() {
@@ -70,6 +88,7 @@ export default function AssessmentsPage() {
   const [localScores, setLocalScores] = useState<
     Record<string, { score: string; comment: string }>
   >({});
+  const [blockScores, setBlockScores] = useState<Record<string, BlockRow>>({});
   const [searchStudent, setSearchStudent] = useState('');
 
   const [form, setForm] = useState({
@@ -103,10 +122,76 @@ export default function AssessmentsPage() {
     enabled: !!form.groupId,
   });
   const selectedGroup = selectedGroupRes?.data || selectedGroupRes;
+  // detail() returns snake_case track_id; list() returns camelCase trackId — handle both
+  const formGroupTrackId = (
+    selectedGroup?.trackId || selectedGroup?.track_id
+  )?.toString() || '';
 
-  // Use group-specific subjects when a group is selected
+  // Always fetch track subjects when group has a track
+  const { data: formTrackSubjectsRes } = useQuery({
+    queryKey: ['staff', 'tracks', formGroupTrackId, 'subjects'],
+    queryFn: async () => (await api.get(`/staff/tracks/${formGroupTrackId}/subjects`)).data,
+    enabled: !!formGroupTrackId && modalOpen,
+  });
+  // Endpoint returns a plain array: [{ id, subjectId, name, code, role }]
+  const formTrackSubjects: any[] = Array.isArray(formTrackSubjectsRes)
+    ? formTrackSubjectsRes
+    : formTrackSubjectsRes?.data || [];
+  const formMainSubject = formTrackSubjects.find((s: any) => s.role === 'MAIN');
+
+  // Map to { id, name } objects for the subject dropdown
+  const trackMappedSubjects = formTrackSubjects
+    .map((ts: any) => ({ id: ts.subjectId, name: ts.name, code: ts.code }))
+    .filter((s: any) => s?.id);
+
+  // Group has a track → use ONLY track subjects (strict, no fallback to other subjects)
+  // Group has no track → use group_subjects junction
+  // No group selected → empty
   const groupSubjects = selectedGroup?.subjects || [];
-  const availableSubjects = groupSubjects.length > 0 ? groupSubjects : subjectsList;
+  const availableSubjects = !form.groupId
+    ? []
+    : formGroupTrackId
+    ? trackMappedSubjects        // track mavjud → faqat track fanlari
+    : groupSubjects;             // track yo'q → group_subjects
+
+  // Fetch active timetable for the selected group (only when creating new assessment)
+  const { data: timetablesRes } = useQuery({
+    queryKey: ['staff', 'timetables', 'by-group', form.groupId],
+    queryFn: async () => (await api.get(`/staff/timetables?groupId=${form.groupId}&limit=5`)).data,
+    enabled: !!form.groupId && modalOpen && !editing,
+  });
+  const activeTimetableId = timetablesRes?.data?.[0]?.id;
+
+  // Fetch timetable detail (with lessons) when we have a timetable ID
+  const { data: timetableDetailRes } = useQuery({
+    queryKey: ['staff', 'timetables', 'detail', activeTimetableId],
+    queryFn: async () => (await api.get(`/staff/timetables/${activeTimetableId}`)).data,
+    enabled: !!activeTimetableId && modalOpen && !editing,
+  });
+  const allTimetableLessons: any[] = timetableDetailRes?.lessons || [];
+
+  // Day of week from selected date (1=Mon..6=Sat, 7=Sun)
+  const selectedDow = useMemo(() => {
+    if (!form.heldAt) return null;
+    const d = new Date(form.heldAt);
+    if (isNaN(d.getTime())) return null;
+    const jsDay = d.getDay();
+    return jsDay === 0 ? 7 : jsDay;
+  }, [form.heldAt]);
+
+  const DOW_NAMES: Record<number, string> = {
+    1: 'Dushanba', 2: 'Seshanba', 3: 'Chorshanba',
+    4: 'Payshanba', 5: 'Juma', 6: 'Shanba', 7: 'Yakshanba',
+  };
+
+  const lessonsOnDay = useMemo(() => {
+    if (!selectedDow || !allTimetableLessons.length) return [];
+    return allTimetableLessons.filter((l: any) => l.dayOfWeek === selectedDow);
+  }, [selectedDow, allTimetableLessons]);
+
+  const canCreateAssessment = editing || !activeTimetableId || lessonsOnDay.length > 0;
+
+  const isBlockTest = scoringAssessment?.type === 'BLOCK_TEST';
 
   // Fetch Assessment details (including scores)
   const { data: detail, isLoading: loadingDetail } = useQuery<AssessmentDetail>({
@@ -114,6 +199,32 @@ export default function AssessmentsPage() {
     queryFn: async () => (await api.get(`/staff/assessments/${scoringAssessment.id}`)).data,
     enabled: !!scoringAssessment,
   });
+
+  // For BLOCK_TEST: fetch group detail to get trackId
+  const { data: scoringGroupRes } = useQuery({
+    queryKey: ['staff', 'groups', 'detail', detail?.group?.id],
+    queryFn: async () => (await api.get(`/staff/groups/${detail!.group.id}`)).data,
+    enabled: !!detail?.group?.id && isBlockTest,
+  });
+  const scoringRawGroup = scoringGroupRes?.data || scoringGroupRes;
+  // detail() returns track_id (snake_case); handle both variants
+  const scoringTrackId = (
+    scoringRawGroup?.trackId || scoringRawGroup?.track_id
+  )?.toString() || '';
+
+  // For BLOCK_TEST: fetch track subjects
+  const { data: trackSubjectsRes } = useQuery({
+    queryKey: ['staff', 'tracks', scoringTrackId, 'subjects'],
+    queryFn: async () => (await api.get(`/staff/tracks/${scoringTrackId}/subjects`)).data,
+    enabled: !!scoringTrackId && isBlockTest,
+  });
+  // Endpoint returns a plain array: [{ id, subjectId, name, code, role }]
+  const trackSubjects: any[] = Array.isArray(trackSubjectsRes)
+    ? trackSubjectsRes
+    : trackSubjectsRes?.data || [];
+  const mainSubject = trackSubjects.find((s: any) => s.role === 'MAIN');
+  const secondarySubject = trackSubjects.find((s: any) => s.role === 'SECONDARY');
+  const mandatorySubjects = trackSubjects.filter((s: any) => s.role === 'MANDATORY');
 
   // Fetch all students in the group to ensure we can score everyone
   const { data: groupStudentsRes } = useQuery({
@@ -131,11 +242,26 @@ export default function AssessmentsPage() {
   const [lastId, setLastId] = useState<string | null>(null);
   if (detail && detail.id !== lastId) {
     const initial: any = {};
-    // Load existing scores
+    const blockInit: Record<string, BlockRow> = {};
     (detail.scores ?? []).forEach((s) => {
       initial[s.studentId] = { score: String(s.score ?? ''), comment: s.teacherComment || '' };
+      if (s.teacherComment) {
+        try {
+          const parsed = JSON.parse(s.teacherComment);
+          if (parsed && typeof parsed === 'object' && 'main' in parsed) {
+            blockInit[s.studentId] = {
+              main: String(parsed.main ?? ''),
+              secondary: String(parsed.secondary ?? ''),
+              m1: String(parsed.m1 ?? ''),
+              m2: String(parsed.m2 ?? ''),
+              m3: String(parsed.m3 ?? ''),
+            };
+          }
+        } catch {}
+      }
     });
     setLocalScores(initial);
+    setBlockScores(blockInit);
     setLastId(detail.id);
   }
 
@@ -175,13 +301,37 @@ export default function AssessmentsPage() {
   };
 
   const handleSaveScores = () => {
-    const scoresArray = Object.entries(localScores)
-      .filter(([studentId, data]) => data.score !== '' && validGroupStudentIds.has(studentId))
-      .map(([studentId, data]) => ({
-        studentId,
-        score: parseFloat(data.score),
-        teacherComment: data.comment,
-      }));
+    let scoresArray: any[];
+
+    if (isBlockTest) {
+      const EMPTY: BlockRow = { main: '', secondary: '', m1: '', m2: '', m3: '' };
+      scoresArray = displayStudents
+        .map((s: any) => {
+          const b = blockScores[s.id] || EMPTY;
+          const total = calcDtmTotal(b);
+          if (total === 0) return null;
+          return {
+            studentId: s.id,
+            score: total,
+            teacherComment: JSON.stringify({
+              main: parseFloat(b.main) || 0,
+              secondary: parseFloat(b.secondary) || 0,
+              m1: parseFloat(b.m1) || 0,
+              m2: parseFloat(b.m2) || 0,
+              m3: parseFloat(b.m3) || 0,
+            }),
+          };
+        })
+        .filter(Boolean);
+    } else {
+      scoresArray = Object.entries(localScores)
+        .filter(([studentId, data]) => data.score !== '' && validGroupStudentIds.has(studentId))
+        .map(([studentId, data]) => ({
+          studentId,
+          score: parseFloat(data.score),
+          teacherComment: data.comment,
+        }));
+    }
 
     if (scoresArray.length === 0) {
       toast.warning("Saqlash uchun kamida 1 ta o'quvchiga ball kiriting");
@@ -308,6 +458,9 @@ export default function AssessmentsPage() {
               size="sm"
               onClick={() => {
                 setScoringAssessment(item);
+                setBlockScores({});
+                setLocalScores({});
+                setLastId(null);
                 setScoringOpen(true);
               }}
               className="gap-2"
@@ -335,8 +488,8 @@ export default function AssessmentsPage() {
       <SlideOver
         open={scoringOpen}
         onOpenChange={setScoringOpen}
-        title="Natijalarni kiritish"
-        size="lg"
+        title={isBlockTest ? 'Blok test — DTM natijalarini kiritish' : 'Natijalarni kiritish'}
+        size="xl"
       >
         {loadingDetail ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -378,59 +531,129 @@ export default function AssessmentsPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-4 space-y-3">
-              {displayStudents.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">O'quvchilar topilmadi</div>
-              ) : (
-                displayStudents.map((s: any) => (
-                  <Card
-                    key={s.id}
-                    className={cn(
-                      'transition-all duration-200',
-                      s.score ? 'border-primary/20 bg-primary/5' : 'border-muted',
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                        <div className="flex-1 min-w-0">
-                          <span className="font-bold text-sm block truncate">{s.name}</span>
-                          <span className="text-[10px] text-muted-foreground uppercase font-mono">
-                            ID: {s.id}
-                          </span>
-                        </div>
-                        <div className="flex gap-3 w-full md:w-auto">
-                          <div className="flex-1 md:w-28 relative">
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              className="text-center font-bold h-9"
-                              value={s.score}
-                              onChange={(e) => handleScoreChange(s.id, e.target.value)}
-                            />
-                            <div className="absolute -top-6 right-0 text-[10px] text-muted-foreground">
-                              Ball / {detail?.maxScore}
-                            </div>
-                          </div>
-                          <div className="flex-[2] md:w-60">
-                            <Input
-                              placeholder="Izoh..."
-                              className="h-9 text-xs"
-                              value={s.comment}
-                              onChange={(e) =>
-                                setLocalScores((prev) => ({
-                                  ...prev,
-                                  [s.id]: { ...prev[s.id], comment: e.target.value },
-                                }))
-                              }
-                            />
-                          </div>
+            {isBlockTest ? (
+              <div className="flex-1 overflow-y-auto py-3">
+                {/* DTM info banner */}
+                <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-700 dark:text-amber-400 flex flex-wrap gap-3">
+                  <span>Asosiy ×3.1 (maks 93)</span>
+                  <span>Qo'shimcha ×2.1 (maks 63)</span>
+                  <span>Majburiy ×1.1 (maks 11×3=33)</span>
+                  <span className="font-black">Jami: 189 ball</span>
+                </div>
+                {/* Column headers + student rows — scrollable on small screens */}
+                <div className="overflow-x-auto -mx-1">
+                <div className="min-w-[560px] px-1">
+                <div className="grid gap-1 items-center bg-muted/60 rounded-lg px-2 py-2 mb-2 text-[10px] font-bold uppercase tracking-tight text-muted-foreground"
+                  style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 0.8fr' }}>
+                  <div>O'quvchi</div>
+                  <div className="text-center truncate" title={mainSubject?.name}>{mainSubject?.name || 'Asosiy'}<br/><span className="font-normal normal-case">/30</span></div>
+                  <div className="text-center truncate" title={secondarySubject?.name}>{secondarySubject?.name || "Qo'shimcha"}<br/><span className="font-normal normal-case">/30</span></div>
+                  <div className="text-center truncate" title={mandatorySubjects[0]?.name}>{mandatorySubjects[0]?.name || 'Maj.1'}<br/><span className="font-normal normal-case">/10</span></div>
+                  <div className="text-center truncate" title={mandatorySubjects[1]?.name}>{mandatorySubjects[1]?.name || 'Maj.2'}<br/><span className="font-normal normal-case">/10</span></div>
+                  <div className="text-center truncate" title={mandatorySubjects[2]?.name}>{mandatorySubjects[2]?.name || 'Maj.3'}<br/><span className="font-normal normal-case">/10</span></div>
+                  <div className="text-center text-primary font-black">/189</div>
+                </div>
+                {/* Student rows */}
+                <div className="space-y-1">
+                  {displayStudents.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">O'quvchilar topilmadi</div>
+                  ) : displayStudents.map((s: any) => {
+                    const EMPTY: BlockRow = { main: '', secondary: '', m1: '', m2: '', m3: '' };
+                    const b = blockScores[s.id] || EMPTY;
+                    const total = calcDtmTotal(b);
+                    const hasAny = b.main || b.secondary || b.m1 || b.m2 || b.m3;
+                    const setBlock = (field: keyof BlockRow, value: string) =>
+                      setBlockScores((prev) => ({
+                        ...prev,
+                        [s.id]: { ...(prev[s.id] || EMPTY), [field]: value },
+                      }));
+                    return (
+                      <div
+                        key={s.id}
+                        className={cn(
+                          'grid gap-1 items-center rounded-lg px-2 py-1.5 transition-colors',
+                          hasAny ? 'bg-primary/5 border border-primary/20' : 'border border-transparent hover:bg-muted/40',
+                        )}
+                        style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 0.8fr' }}
+                      >
+                        <span className="text-sm font-medium truncate pr-1">{s.name}</span>
+                        {(['main', 'secondary', 'm1', 'm2', 'm3'] as (keyof BlockRow)[]).map((field, idx) => (
+                          <Input
+                            key={field}
+                            type="number"
+                            min="0"
+                            max={idx < 2 ? 30 : 10}
+                            placeholder="0"
+                            className="h-8 text-center px-1 text-sm font-bold"
+                            value={b[field]}
+                            onChange={(e) => setBlock(field, e.target.value)}
+                          />
+                        ))}
+                        <div className={cn('text-center font-black text-sm tabular-nums', total > 0 ? 'text-primary' : 'text-muted-foreground/40')}>
+                          {total > 0 ? total : '—'}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+                    );
+                  })}
+                </div>
+                </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto py-4 space-y-3">
+                {displayStudents.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">O'quvchilar topilmadi</div>
+                ) : (
+                  displayStudents.map((s: any) => (
+                    <Card
+                      key={s.id}
+                      className={cn(
+                        'transition-all duration-200',
+                        s.score ? 'border-primary/20 bg-primary/5' : 'border-muted',
+                      )}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-sm block truncate">{s.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                              ID: {s.id}
+                            </span>
+                          </div>
+                          <div className="flex gap-3 w-full md:w-auto">
+                            <div className="flex-1 md:w-28 relative">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                className="text-center font-bold h-9"
+                                value={s.score}
+                                onChange={(e) => handleScoreChange(s.id, e.target.value)}
+                              />
+                              <div className="absolute -top-6 right-0 text-[10px] text-muted-foreground">
+                                Ball / {detail?.maxScore}
+                              </div>
+                            </div>
+                            <div className="flex-[2] md:w-60">
+                              <Input
+                                placeholder="Izoh..."
+                                className="h-9 text-xs"
+                                value={s.comment}
+                                onChange={(e) =>
+                                  setLocalScores((prev) => ({
+                                    ...prev,
+                                    [s.id]: { ...prev[s.id], comment: e.target.value },
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            )}
 
             <div className="sticky bottom-0 bg-background pt-4 pb-2 border-t mt-auto flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setScoringOpen(false)}>
@@ -496,7 +719,15 @@ export default function AssessmentsPage() {
             >
               <SelectTrigger>
                 <SelectValue
-                  placeholder={!form.groupId ? 'Avval guruhni tanlang' : 'Fanni tanlang'}
+                  placeholder={
+                    !form.groupId
+                      ? 'Avval guruhni tanlang'
+                      : formGroupTrackId && trackMappedSubjects.length === 0
+                      ? 'Yo\'nalish fanlari yuklanmoqda...'
+                      : availableSubjects.length === 0
+                      ? 'Bu guruhga fan biriktirilmagan'
+                      : 'Fanni tanlang'
+                  }
                 />
               </SelectTrigger>
               <SelectContent>
@@ -513,7 +744,15 @@ export default function AssessmentsPage() {
             <Select
               value={form.type}
               onValueChange={(v) =>
-                setForm({ ...form, type: v, maxScore: v === 'BLOCK_TEST' ? '189' : form.maxScore })
+                setForm({
+                  ...form,
+                  type: v,
+                  maxScore: v === 'BLOCK_TEST' ? '189' : form.maxScore,
+                  subjectId:
+                    v === 'BLOCK_TEST' && formMainSubject
+                      ? String(formMainSubject.subjectId || formMainSubject.subject?.id || '')
+                      : form.subjectId,
+                })
               }
             >
               <SelectTrigger>
@@ -541,6 +780,31 @@ export default function AssessmentsPage() {
               onChange={(e) => setForm({ ...form, heldAt: e.target.value })}
             />
           </div>
+          {!editing && form.groupId && form.heldAt && (
+            <div className="col-span-1 md:col-span-2">
+              {lessonsOnDay.length > 0 ? (
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-md p-3">
+                  <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-2">
+                    {DOW_NAMES[selectedDow ?? 1]} kuni {lessonsOnDay.length} ta dars mavjud:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lessonsOnDay.map((l: any) => (
+                      <Badge key={l.id} variant="outline" className="text-xs border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                        {l.periodNo}-dars • {l.subject?.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : activeTimetableId ? (
+                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    <strong>{DOW_NAMES[selectedDow ?? 1]}</strong> kuni bu guruhda dars yo'q. Test faqat dars bo'lgan kuni tuzilishi mumkin.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Max ball</Label>
             <Input
@@ -590,6 +854,8 @@ export default function AssessmentsPage() {
           </Button>
           <Button
             className="w-full sm:w-auto"
+            disabled={!canCreateAssessment}
+            title={!canCreateAssessment ? 'Bu kunda dars mavjud emas' : undefined}
             onClick={async () => {
               const payload = {
                 ...form,

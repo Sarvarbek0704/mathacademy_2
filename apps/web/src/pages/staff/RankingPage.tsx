@@ -165,14 +165,14 @@ export default function RankingPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Percent className="h-8 w-8 text-emerald-500 opacity-70" />
             <div>
-              <p className="text-xs text-muted-foreground">O'rtacha %</p>
+              <p className="text-xs text-muted-foreground">Guruh o'rtacha</p>
               <p className="text-2xl font-bold">{avgPct.toFixed(1)}%</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <Calendar className="h-8 w-8 text-blue-500 opacity-70" />
+            <Trophy className="h-8 w-8 text-amber-500 opacity-70" />
             <div>
               <p className="text-xs text-muted-foreground">Eng yuqori</p>
               <p className="text-2xl font-bold">
@@ -273,8 +273,8 @@ export default function RankingPage() {
                           </div>
                         </th>
                       ))}
-                      <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground min-w-[80px]">
-                        Jami %
+                      <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider text-muted-foreground min-w-[90px]">
+                        O'rtacha %
                       </th>
                     </tr>
                   </thead>
@@ -308,12 +308,17 @@ export default function RankingPage() {
                           );
                         })}
                         <td className="px-3 py-3 text-center">
-                          <Badge
-                            variant="outline"
-                            className={`font-mono font-bold ${pctColor(row.percentage ?? 0)}`}
-                          >
-                            {(row.percentage ?? 0).toFixed(1)}%
-                          </Badge>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge
+                              variant="outline"
+                              className={`font-mono font-bold ${pctColor(row.percentage ?? 0)}`}
+                            >
+                              {(row.percentage ?? 0).toFixed(1)}%
+                            </Badge>
+                            <span className="text-[9px] text-muted-foreground">
+                              {row.takenCount ?? 0}/{row.testsCount ?? 0} test
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}

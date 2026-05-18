@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SlideOver } from '@/components/shared/SlideOver';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { AvatarUpload } from '@/components/shared/AvatarUpload';
 import { useCrud } from '@/hooks/useCrud';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Users, 
   Trash2, 
@@ -112,6 +113,7 @@ export default function UsersPage() {
               <CardHeader className="p-5 flex flex-row items-start justify-between space-y-0">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12 border-2 border-background shadow-md">
+                    {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} className="object-cover" />}
                     <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                       {(user.fullName || user.username)[0].toUpperCase()}
                     </AvatarFallback>
@@ -183,6 +185,21 @@ export default function UsersPage() {
       {/* Form SlideOver */}
       <SlideOver open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Foydalanuvchini tahrirlash" : "Yangi xodim qo'shish"} size="md">
         <div className="space-y-6 pt-4">
+          {editing && (
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <AvatarUpload
+                currentUrl={editing.photoUrl || null}
+                ownerType="USER"
+                ownerId={String(editing.id)}
+                purpose="USER_AVATAR"
+                size="md"
+              />
+              <div>
+                <p className="text-sm font-medium">{editing.fullName}</p>
+                <p className="text-xs text-muted-foreground">Rasmni o'zgartirish uchun bosing</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Ism va Familiya</Label>

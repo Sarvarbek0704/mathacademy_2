@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarUpload } from '@/components/shared/AvatarUpload';
+import { useQuery } from '@tanstack/react-query';
 import {
   Loader2,
   ArrowLeft,
@@ -37,6 +39,22 @@ export default function StudentDetailPage() {
   const [violations, setViolations] = useState<any[]>([]);
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  const { data: photoRes } = useQuery({
+    queryKey: ['staff', 'files', 'student-photo', id],
+    queryFn: async () =>
+      (await api.get(`/staff/files?ownerType=STUDENT&ownerId=${id}&purpose=STUDENT_PHOTO&limit=1`)).data,
+    enabled: !!id,
+  });
+
+  const resolvedPhotoUrl = (() => {
+    const url = photoUrl || photoRes?.data?.[0]?.url || photoRes?.[0]?.url;
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
+    return `${base}${url}`;
+  })();
 
   useEffect(() => {
     if (!id) {
@@ -177,12 +195,14 @@ export default function StudentDetailPage() {
         <CardHeader>
           <div className="flex items-start justify-between gap-6">
             <div className="flex items-center gap-6 flex-1">
-              <Avatar className="h-28 w-28 border-4 border-primary/20">
-                <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
-                  {(student.firstName?.[0] || student.first_name?.[0] || '?').toUpperCase()}
-                  {(student.lastName?.[0] || student.last_name?.[0] || '?').toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <AvatarUpload
+                currentUrl={resolvedPhotoUrl}
+                ownerType="STUDENT"
+                ownerId={String(student.id)}
+                purpose="STUDENT_PHOTO"
+                size="lg"
+                onUploaded={(url) => setPhotoUrl(url)}
+              />
               <div className="flex-1">
                 <h2 className="text-4xl font-bold text-primary">{studentName}</h2>
                 <p className="text-2xl text-muted-foreground mt-2 font-mono font-bold">
