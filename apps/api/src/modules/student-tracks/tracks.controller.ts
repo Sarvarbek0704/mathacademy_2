@@ -26,6 +26,7 @@ import { TracksService } from './tracks.service';
 import { CreateTrackDto } from './dto/create-track.dto';
 import { UpdateTrackDto } from './dto/update-track.dto';
 import { ListTracksQueryDto } from './dto/list-tracks.query.dto';
+import { AddTrackSubjectDto } from './dto/manage-track-subject.dto';
 
 @ApiTags('Staff - Student Tracks')
 @ApiBearerAuth('access-token')
@@ -108,5 +109,35 @@ export class TracksController {
       userId: this.userId(req),
       ipAddress: this.ip(req),
     });
+  }
+
+  @Get(':id/subjects')
+  @RequirePermissions('tracks.read')
+  @ApiOperation({ summary: 'Get subjects assigned to a track' })
+  getSubjects(@Req() req: any, @Param('id') id: string) {
+    return this.svc.getTrackSubjects({ tenantId: this.tenantId(req), trackId: id });
+  }
+
+  @Post(':id/subjects')
+  @RequirePermissions('tracks.write')
+  @ApiOperation({ summary: 'Add a subject to a track' })
+  addSubject(@Req() req: any, @Param('id') id: string, @Body() dto: AddTrackSubjectDto) {
+    return this.svc.addSubject({
+      tenantId: this.tenantId(req),
+      trackId: id,
+      subjectId: dto.subjectId,
+      role: dto.role,
+    });
+  }
+
+  @Delete(':id/subjects/:subjectId')
+  @RequirePermissions('tracks.write')
+  @ApiOperation({ summary: 'Remove a subject from a track' })
+  removeSubject(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('subjectId') subjectId: string,
+  ) {
+    return this.svc.removeSubject({ tenantId: this.tenantId(req), trackId: id, subjectId });
   }
 }

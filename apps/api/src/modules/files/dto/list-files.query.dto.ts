@@ -23,6 +23,7 @@ export class ListFilesQueryDto {
       'COMPETITION',
       'AWARD',
       'DISPLAY_ITEM',
+      'COHORT',
       'OTHER',
     ],
   })
@@ -39,6 +40,7 @@ export class ListFilesQueryDto {
     'COMPETITION',
     'AWARD',
     'DISPLAY_ITEM',
+    'COHORT',
     'OTHER',
   ])
   ownerType?: string;

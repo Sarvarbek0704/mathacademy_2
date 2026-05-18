@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -105,6 +106,44 @@ export class CohortsController {
     return this.svc.delete({
       tenantId: this.tenantId(req),
       cohortId: id.toString(),
+      userId: this.userId(req),
+      ipAddress: this.ip(req),
+    });
+  }
+
+  @Get(':id/detail')
+  @RequirePermissions('cohorts.read')
+  @ApiOperation({ summary: 'Get rich cohort detail — students with groups, outcomes, risk' })
+  getDetail(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.svc.getDetail({
+      tenantId: this.tenantId(req),
+      cohortId: id.toString(),
+    });
+  }
+
+  @Get(':id/results')
+  @RequirePermissions('cohorts.read')
+  @ApiOperation({ summary: 'Get assessment results for all cohort students' })
+  getResults(@Req() req: any, @Param('id', ParseBigIntPipe) id: bigint) {
+    return this.svc.getResults({
+      tenantId: this.tenantId(req),
+      cohortId: id.toString(),
+    });
+  }
+
+  @Delete(':id/students/:studentId')
+  @RequirePermissions('cohorts.write')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Remove a student from cohort' })
+  removeStudent(
+    @Req() req: any,
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Param('studentId', ParseBigIntPipe) studentId: bigint,
+  ) {
+    return this.svc.removeStudent({
+      tenantId: this.tenantId(req),
+      cohortId: id.toString(),
+      studentId: studentId.toString(),
       userId: this.userId(req),
       ipAddress: this.ip(req),
     });

@@ -1178,6 +1178,90 @@ export class BillingService {
     });
   }
 
+  async guardianPayInvoice(
+    tenantId: string,
+    studentAccountId: string,
+    invoiceId: string,
+    paidAmount: number,
+    method: 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER' = 'CARD',
+  ) {
+    const tenant_id = toBigInt(tenantId, 'tenantId');
+    const student_account_id = toBigInt(studentAccountId, 'studentAccountId');
+    const invoice_id = toBigInt(invoiceId, 'invoiceId');
+
+    if (paidAmount <= 0) {
+      throw new BadRequestException('PAID_AMOUNT_MUST_BE_POSITIVE');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Verify account belongs to this tenant
+      const account = await tx.student_accounts.findFirst({
+        where: { id: student_account_id, tenant_id },
+        select: { student_id: true },
+      });
+      if (!account) throw new NotFoundException('GUARDIAN_ACCOUNT_NOT_FOUND');
+
+      // Verify invoice belongs to this student & tenant
+      const invoice = await tx.invoices.findFirst({
+        where: { id: invoice_id, tenant_id, student_id: account.student_id },
+        select: { id: true, amount: true, status: true },
+      });
+      if (!invoice) throw new NotFoundException('INVOICE_NOT_FOUND');
+      if (invoice.status === 'PAID') throw new BadRequestException('INVOICE_ALREADY_PAID');
+      if (invoice.status === 'CANCELLED') throw new BadRequestException('INVOICE_CANCELLED');
+
+      // Create payment (no staff user — online source)
+      const payment = await tx.payments.create({
+        data: {
+          tenant_id,
+          invoice_id,
+          source: 'ONLINE',
+          paid_amount: new Prisma.Decimal(paidAmount),
+          method,
+          created_by_user_id: null,
+          received_by_user_id: null,
+        },
+        select: { id: true, paid_amount: true },
+      });
+
+      // Recalculate totals
+      const totalPaidAgg = await tx.payments.aggregate({
+        where: { invoice_id },
+        _sum: { paid_amount: true },
+      });
+      const totalPaid = totalPaidAgg._sum.paid_amount ?? new Prisma.Decimal(0);
+      const isFullyPaid = totalPaid.gte(invoice.amount);
+
+      if (isFullyPaid && invoice.status !== 'PAID') {
+        await tx.invoices.update({
+          where: { id: invoice_id },
+          data: { status: 'PAID' },
+        });
+        await tx.meal_student_charges.updateMany({
+          where: { tenant_id, invoice_id },
+          data: { status: 'PAID' },
+        });
+        await tx.dorm_student_charges.updateMany({
+          where: { tenant_id, invoice_id },
+          data: { status: 'PAID' },
+        });
+      } else if (Number(totalPaid) > 0) {
+        await tx.invoices.update({
+          where: { id: invoice_id },
+          data: { status: 'PARTIAL' },
+        });
+      }
+
+      return {
+        ok: true,
+        paymentId: payment.id.toString(),
+        paidAmount: payment.paid_amount.toString(),
+        totalPaid: totalPaid.toString(),
+        invoiceStatus: isFullyPaid ? 'PAID' : 'PARTIAL',
+      };
+    });
+  }
+
   async listPayments(tenantId: string, q: ListPaymentsQueryDto) {
     const tenant_id = toBigInt(tenantId, 'tenantId');
     const page = q.page ?? 1;

@@ -10,9 +10,16 @@ import {
   Max,
   IsIn,
   Matches,
+  MaxLength,
 } from 'class-validator';
 
 export class LeaveListQueryDto {
+  @ApiPropertyOptional({ example: 'Ali', description: 'Search by student name' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
   @ApiPropertyOptional({ example: '123', description: 'Filter by student ID' })
   @IsOptional()
   @IsString()

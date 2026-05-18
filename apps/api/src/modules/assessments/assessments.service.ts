@@ -83,7 +83,30 @@ export class AssessmentsService {
         throw new BadRequestException('HELD_AT_CANNOT_BE_IN_FUTURE');
       }
 
-      // 5. Create assessment
+      // 5. Validate timetable — must have at least one lesson on this day
+      const dayOfWeek = held_at.getDay(); // 0=Sun,1=Mon..6=Sat
+      const timetableDow = dayOfWeek === 0 ? 7 : dayOfWeek; // store Sun as 7
+
+      const activeTimetable = await tx.timetable.findFirst({
+        where: { group_id, tenant_id },
+        select: { id: true },
+        orderBy: { created_at: 'desc' },
+      });
+
+      if (!activeTimetable) {
+        throw new BadRequestException('NO_TIMETABLE_FOR_GROUP');
+      }
+
+      const hasLesson = await tx.timetable_lessons.findFirst({
+        where: { timetable_id: activeTimetable.id, day_of_week: timetableDow },
+        select: { id: true },
+      });
+
+      if (!hasLesson) {
+        throw new BadRequestException('NO_LESSONS_THIS_DAY');
+      }
+
+      // 6. Create assessment
       const assessment = await tx.assessments.create({
         data: {
           tenant_id,

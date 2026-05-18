@@ -120,6 +120,9 @@ export class SubjectsService {
           orderBy,
           include: {
             student_tracks: { select: { id: true, name: true, color: true } },
+            track_subjects: {
+              include: { student_tracks: { select: { id: true, name: true, color: true } } },
+            },
             _count: {
               select: {
                 assessments: true,
@@ -144,6 +147,12 @@ export class SubjectsService {
             name: (s as any).student_tracks.name,
             color: (s as any).student_tracks.color,
           } : null,
+          tracks: (s as any).track_subjects?.map((ts: any) => ({
+            id: ts.student_tracks.id.toString(),
+            name: ts.student_tracks.name,
+            color: ts.student_tracks.color,
+            role: ts.role,
+          })) || [],
           createdAt: s.created_at,
           assessmentsCount: s._count.assessments,
           groupCount: s._count.group_subjects,
@@ -173,6 +182,9 @@ export class SubjectsService {
       const subject = await this.prisma.subjects.findFirst({
         where: { id: subject_id, tenant_id },
         include: {
+          track_subjects: {
+            include: { student_tracks: { select: { id: true, name: true, color: true } } },
+          },
           _count: {
             select: {
               assessments: true,
@@ -190,6 +202,12 @@ export class SubjectsService {
         name: subject.name,
         isCore: subject.is_core,
         createdAt: subject.created_at,
+        tracks: (subject as any).track_subjects?.map((ts: any) => ({
+          id: ts.student_tracks.id.toString(),
+          name: ts.student_tracks.name,
+          color: ts.student_tracks.color,
+          role: ts.role,
+        })) || [],
         assessmentsCount: subject._count.assessments,
         groupsCount: subject._count.group_subjects,
         certificatesCount: subject._count.certificates,

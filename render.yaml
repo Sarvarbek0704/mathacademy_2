@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: mathacademy-api
+    runtime: node
+    rootDir: apps/api
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mathacademy-db
+          property: connectionString
+      - key: PORT
+        value: 4000
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_DAYS
+        value: 30
+      - key: COOKIE_NAME_REFRESH
+        value: madc_rt
+      - key: COOKIE_SECURE
+        value: true
+      - key: COOKIE_SAME_SITE
+        value: none
+      - key: COOKIE_DOMAIN
+        sync: false   # Render domenini qo'lda kiriting
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: ENABLE_SWAGGER
+        value: false
+      - key: ENABLE_CORS
+        value: true
+      - key: WEB_PORT
+        value: 3000
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: MAX_UPLOAD_MB
+        value: 25
+      - key: RATE_LIMIT_TTL
+        value: 60
+      - key: RATE_LIMIT_MAX
+        value: 100
+      - key: MIN_PASSWORD_LENGTH
+        value: 6
+      - key: PASSWORD_COMPLEXITY
+        value: true
+      - key: MAX_SESSIONS_PER_USER
+        value: 10
+      - key: SESSION_INACTIVITY_TIMEOUT
+        value: 86400
+
+databases:
+  - name: mathacademy-db
+    databaseName: mathacademy
+    user: mathacademy
+    plan: free

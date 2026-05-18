@@ -150,10 +150,15 @@ export class LeavesService {
         where.student_id = toBigInt(args.query.studentId, 'studentId');
       }
 
+      const studentWhere: Prisma.studentsWhereInput = {};
       if (args.query.groupId) {
-        where.students = {
-          current_group_id: toBigInt(args.query.groupId, 'groupId'),
-        };
+        studentWhere.current_group_id = toBigInt(args.query.groupId, 'groupId');
+      }
+      if (args.query.search) {
+        studentWhere.full_name = { contains: args.query.search, mode: 'insensitive' };
+      }
+      if (Object.keys(studentWhere).length > 0) {
+        where.students = studentWhere;
       }
 
       if (args.query.status) {
@@ -161,27 +166,14 @@ export class LeavesService {
       }
 
       if (args.query.from || args.query.to) {
-        where.OR = [
-          {
-            start_at: {},
-          },
-          {
-            end_at: {},
-          },
-        ];
+        // Overlap check: leave overlaps [from, to] if start_at <= toDate AND end_at >= fromDate
         if (args.query.from) {
-          (where.OR[0].start_at as Prisma.DateTimeFilter).gte = new Date(
-            args.query.from,
-          );
-          (where.OR[1].end_at as Prisma.DateTimeFilter).gte = new Date(
-            args.query.from,
-          );
+          where.end_at = { gte: new Date(args.query.from) };
         }
         if (args.query.to) {
           const toDate = new Date(args.query.to);
           toDate.setHours(23, 59, 59, 999);
-          (where.OR[0].start_at as Prisma.DateTimeFilter).lte = toDate;
-          (where.OR[1].end_at as Prisma.DateTimeFilter).lte = toDate;
+          where.start_at = { lte: toDate };
         }
       }
 
@@ -429,6 +421,39 @@ export class LeavesService {
           status: updated.status,
         };
       });
+    } catch (error) {
+      rethrowServiceError(error);
+    }
+  }
+
+  // ==================== STATS ====================
+
+  async stats(args: { tenantId: string }) {
+    try {
+      const tenant_id = toBigInt(args.tenantId, 'tenantId');
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const [pending, approved, rejected, closed, activeToday] =
+        await this.prisma.$transaction([
+          this.prisma.leave_requests.count({ where: { tenant_id, status: 'PENDING' } }),
+          this.prisma.leave_requests.count({ where: { tenant_id, status: 'APPROVED' } }),
+          this.prisma.leave_requests.count({ where: { tenant_id, status: 'REJECTED' } }),
+          this.prisma.leave_requests.count({ where: { tenant_id, status: 'CLOSED' } }),
+          this.prisma.leave_requests.count({
+            where: {
+              tenant_id,
+              status: 'APPROVED',
+              start_at: { lte: todayEnd },
+              end_at: { gte: todayStart },
+            },
+          }),
+        ]);
+
+      return { pending, approved, rejected, closed, activeToday };
     } catch (error) {
       rethrowServiceError(error);
     }

@@ -152,26 +152,26 @@ export class RankingService {
       const data = students.map((st) => {
         const studentScores = scoreMap.get(st.id) || new Map();
         const perAssessment: Record<string, number | null> = {};
-        let totalScored = 0;
-        let totalMax = 0;
+        let sumPct = 0;
+        let countTaken = 0;
 
         for (const a of assessments) {
           const raw = studentScores.get(a.id);
           perAssessment[a.id.toString()] = raw !== undefined ? raw : null;
           if (raw !== undefined) {
-            totalScored += raw;
-            totalMax += Number(a.max_score);
+            sumPct += (raw / Number(a.max_score)) * 100;
+            countTaken++;
           }
         }
 
-        const pct = totalMax > 0 ? (totalScored / totalMax) * 100 : 0;
+        const avgPct = countTaken > 0 ? sumPct / countTaken : 0;
         return {
           studentId: st.id.toString(),
           studentName: st.full_name,
           scores: perAssessment,
-          totalScored: Math.round(totalScored * 100) / 100,
-          totalMax,
-          percentage: Math.round(pct * 100) / 100,
+          testsCount: assessments.length,
+          takenCount: countTaken,
+          percentage: Math.round(avgPct * 100) / 100,
         };
       });
 

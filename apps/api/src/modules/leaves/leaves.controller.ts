@@ -78,6 +78,13 @@ export class LeavesController {
     });
   }
 
+  @Get('stats')
+  @RequirePermissions('leaves.read')
+  @ApiOperation({ summary: 'Get leave request statistics' })
+  stats(@Req() req: any) {
+    return this.svc.stats({ tenantId: this.tenantId(req) });
+  }
+
   @Get(':id')
   @RequirePermissions('leaves.read')
   @ApiOperation({ summary: 'Get leave request details' })

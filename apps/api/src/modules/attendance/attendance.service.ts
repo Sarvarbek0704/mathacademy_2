@@ -58,23 +58,88 @@ export class AttendanceService {
         throw new BadRequestException('INVALID_DATE');
       }
 
-      // 3. Upsert session (unique: group_id + session_date + type)
-      const session = await tx.attendance_sessions.upsert({
+      // Future date check
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (session_date > today) {
+        throw new BadRequestException('CANNOT_TAKE_FUTURE_ATTENDANCE');
+      }
+
+      // 3. Validate that the session type is backed by a real schedule
+      const jsDay = session_date.getDay(); // 0=Sun..6=Sat
+      const dayOfWeek = jsDay === 0 ? 7 : jsDay; // 1=Mon..7=Sun
+
+      let period_no = 0;
+
+      if (args.dto.type === 'CLASS') {
+        if (!args.dto.periodNo || args.dto.periodNo < 1) {
+          throw new BadRequestException('PERIOD_NO_REQUIRED_FOR_CLASS');
+        }
+        period_no = args.dto.periodNo;
+
+        const timetable = await tx.timetable.findFirst({
+          where: { group_id, tenant_id },
+          select: { id: true },
+        });
+        if (!timetable) {
+          throw new BadRequestException('NO_TIMETABLE_FOR_GROUP');
+        }
+        const lesson = await tx.timetable_lessons.findFirst({
+          where: { timetable_id: timetable.id, day_of_week: dayOfWeek, period_no },
+          select: { id: true },
+        });
+        if (!lesson) {
+          throw new BadRequestException('NO_LESSON_FOR_THIS_PERIOD');
+        }
+      }
+
+      if (args.dto.type === 'EVENT') {
+        const dayStart = new Date(session_date);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(session_date);
+        dayEnd.setUTCHours(23, 59, 59, 999);
+        const event = await tx.events.findFirst({
+          where: { tenant_id, starts_at: { gte: dayStart, lte: dayEnd } },
+          select: { id: true },
+        });
+        if (!event) {
+          throw new BadRequestException('NO_EVENTS_THIS_DAY');
+        }
+      }
+
+      // 4. Upsert session (unique: group_id + session_date + type + period_no)
+      const existingSession = await tx.attendance_sessions.findUnique({
         where: {
-          group_id_session_date_type: {
+          group_id_session_date_type_period_no: {
             group_id,
             session_date,
             type: args.dto.type,
+            period_no,
+          },
+        },
+        select: { id: true },
+      });
+
+      const isNew = !existingSession;
+
+      const session = await tx.attendance_sessions.upsert({
+        where: {
+          group_id_session_date_type_period_no: {
+            group_id,
+            session_date,
+            type: args.dto.type,
+            period_no,
           },
         },
         update: {
-          created_by_user_id, // update creator if exists
+          created_by_user_id,
         },
         create: {
           tenant_id,
           group_id,
           session_date,
           type: args.dto.type,
+          period_no,
           created_by_user_id,
         },
         include: {
@@ -83,19 +148,6 @@ export class AttendanceService {
           },
         },
       });
-
-      const existing = await tx.attendance_sessions.findUnique({
-        where: {
-          group_id_session_date_type: {
-            group_id,
-            session_date,
-            type: args.dto.type,
-          },
-        },
-        select: { id: true },
-      });
-
-      const isNew = !existing;
 
       // 4. Audit log
       await this.auditLogger.log({
@@ -211,6 +263,7 @@ export class AttendanceService {
         id: item.id.toString(),
         sessionDate: item.session_date,
         type: item.type,
+        periodNo: item.period_no,
         createdAt: item.created_at,
         group: {
           id: item.groups.id.toString(),

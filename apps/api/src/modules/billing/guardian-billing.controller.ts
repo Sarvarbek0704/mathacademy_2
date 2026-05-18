@@ -1,7 +1,10 @@
 // apps/api/src/modules/billing/guardian-billing.controller.ts
 import {
+  Body,
   Controller,
   Get,
+  Param,
+  Post,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -58,6 +61,24 @@ export class GuardianBillingController {
   payments(@Req() req: any) {
     const { tenantId, studentAccountId } = this.getGuardianInfo(req);
     return this.service.guardianPayments(tenantId, studentAccountId);
+  }
+
+  @Post('invoices/:id/pay')
+  @ApiOperation({ summary: 'Submit an online payment for an invoice' })
+  @ApiResponse({ status: 201, description: 'Payment recorded' })
+  payInvoice(
+    @Req() req: any,
+    @Param('id') invoiceId: string,
+    @Body() body: { paidAmount: number; method?: 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER' },
+  ) {
+    const { tenantId, studentAccountId } = this.getGuardianInfo(req);
+    return this.service.guardianPayInvoice(
+      tenantId,
+      studentAccountId,
+      invoiceId,
+      Number(body.paidAmount),
+      body.method ?? 'CARD',
+    );
   }
 
   @Get('summary')

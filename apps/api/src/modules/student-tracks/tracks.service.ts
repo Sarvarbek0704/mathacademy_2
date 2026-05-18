@@ -11,6 +11,7 @@ import { rethrowServiceError } from '../../common/utils/service-error.util';
 import { CreateTrackDto } from './dto/create-track.dto';
 import { UpdateTrackDto } from './dto/update-track.dto';
 import { ListTracksQueryDto } from './dto/list-tracks.query.dto';
+import { SubjectRole } from '@prisma/client';
 
 function toBigInt(value: unknown, field = 'id'): bigint {
   const s = String(value ?? '').trim();
@@ -106,7 +107,7 @@ export class TracksService {
           take: limit,
           orderBy,
           include: {
-            _count: { select: { groups: true, students: true } },
+            _count: { select: { groups: true, students: true, track_subjects: true } },
           },
         }),
       ]);
@@ -122,6 +123,7 @@ export class TracksService {
           studentCount: t._count.students,
           groupsCount: t._count.groups,
           studentsCount: t._count.students,
+          subjectCount: t._count.track_subjects,
         })),
         meta: {
           page,
@@ -263,6 +265,76 @@ export class TracksService {
       });
 
       return { ok: true };
+    } catch (error) {
+      rethrowServiceError(error);
+    }
+  }
+
+  async addSubject(args: { tenantId: string; trackId: string; subjectId: string; role?: string }) {
+    try {
+      const tenant_id = toBigInt(args.tenantId, 'tenantId');
+      const track_id = toBigInt(args.trackId, 'trackId');
+      const subject_id = toBigInt(args.subjectId, 'subjectId');
+      const role = (args.role as SubjectRole) || SubjectRole.MANDATORY;
+
+      // Check MAIN/SECONDARY uniqueness per track
+      if (role === SubjectRole.MAIN || role === SubjectRole.SECONDARY) {
+        const existing = await this.prisma.track_subjects.findFirst({
+          where: { tenant_id, track_id, role },
+        });
+        if (existing) {
+          await this.prisma.track_subjects.update({
+            where: { id: existing.id },
+            data: { subject_id },
+          });
+          return { ok: true };
+        }
+      }
+
+      await this.prisma.track_subjects.upsert({
+        where: { tenant_id_track_id_subject_id: { tenant_id, track_id, subject_id } },
+        create: { tenant_id, track_id, subject_id, role },
+        update: { role },
+      });
+      return { ok: true };
+    } catch (error) {
+      rethrowServiceError(error);
+    }
+  }
+
+  async removeSubject(args: { tenantId: string; trackId: string; subjectId: string }) {
+    try {
+      const tenant_id = toBigInt(args.tenantId, 'tenantId');
+      const track_id = toBigInt(args.trackId, 'trackId');
+      const subject_id = toBigInt(args.subjectId, 'subjectId');
+
+      await this.prisma.track_subjects.deleteMany({
+        where: { tenant_id, track_id, subject_id },
+      });
+      return { ok: true };
+    } catch (error) {
+      rethrowServiceError(error);
+    }
+  }
+
+  async getTrackSubjects(args: { tenantId: string; trackId: string }) {
+    try {
+      const tenant_id = toBigInt(args.tenantId, 'tenantId');
+      const track_id = toBigInt(args.trackId, 'trackId');
+
+      const items = await this.prisma.track_subjects.findMany({
+        where: { tenant_id, track_id },
+        include: { subjects: { select: { id: true, name: true, code: true } } },
+        orderBy: { role: 'asc' },
+      });
+
+      return items.map((ts) => ({
+        id: ts.id.toString(),
+        subjectId: ts.subject_id.toString(),
+        name: ts.subjects.name,
+        code: ts.subjects.code,
+        role: ts.role,
+      }));
     } catch (error) {
       rethrowServiceError(error);
     }

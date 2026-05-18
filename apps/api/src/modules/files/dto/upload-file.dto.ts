@@ -15,6 +15,7 @@ export class UploadFileDto {
       'COMPETITION',
       'AWARD',
       'DISPLAY_ITEM',
+      'COHORT',
       'OTHER',
     ],
   })
@@ -30,6 +31,7 @@ export class UploadFileDto {
     'COMPETITION',
     'AWARD',
     'DISPLAY_ITEM',
+    'COHORT',
     'OTHER',
   ])
   ownerType!: string;

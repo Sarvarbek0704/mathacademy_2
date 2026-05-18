@@ -6,7 +6,10 @@ import {
   Matches,
   IsOptional,
   MaxLength,
+  IsInt,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateAttendanceSessionDto {
   @ApiProperty({
@@ -34,6 +37,17 @@ export class CreateAttendanceSessionDto {
   @IsString()
   @IsIn(['CLASS', 'STUDY_HALL', 'EVENT'])
   type!: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Period/lesson number within the day (required for CLASS type). 0 for non-class sessions.',
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  periodNo?: number;
 
   @ApiPropertyOptional({
     example: 'Morning lesson',
