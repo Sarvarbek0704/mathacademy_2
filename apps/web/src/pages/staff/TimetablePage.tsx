@@ -55,6 +55,15 @@ function lessonPosition(startsAt: string, endsAt: string): { top: number; height
 
 const HOUR_LABELS = Array.from({ length: MAX_HOUR - MIN_HOUR + 1 }, (_, i) => i + MIN_HOUR);
 
+const TIME_SLOTS = Array.from({ length: MAX_HOUR - MIN_HOUR }, (_, i) => {
+  const h = MIN_HOUR + i;
+  return `${String(h).padStart(2, '0')}:00`;
+});
+
+function lessonHeightPx(startsAt: string, endsAt: string): number {
+  return lessonPosition(startsAt, endsAt).height;
+}
+
 const WEEKDAYS = [
   { value: 1, label: 'Dushanba' },
   { value: 2, label: 'Seshanba' },

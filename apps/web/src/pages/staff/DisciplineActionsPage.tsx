@@ -53,7 +53,7 @@ export default function DisciplineActionsPage() {
   };
 
   const columns: Column<any>[] = [
-    { key: 'student', title: "O'quvchi", render: (i) => i.student?.fullName || i.student?.full_name || '-' },
+    { key: 'student', title: "O'quvchi", render: (i) => i.studentName || i.student?.fullName || i.student?.full_name || '-' },
     { key: 'actionType', title: 'Jazo turi', render: (i) => <StatusBadge status={actionTypeColors[i.actionType] || 'warning'} label={actionTypeLabels[i.actionType] || i.actionType} /> },
     { key: 'reason', title: 'Sabab', render: (i) => <span className="max-w-xs truncate block">{i.reason}</span> },
     { key: 'issuedAt', title: 'Sana', render: (i) => (i.issuedAt || i.issued_at) ? new Date(i.issuedAt || i.issued_at).toLocaleDateString('uz') : '-' },

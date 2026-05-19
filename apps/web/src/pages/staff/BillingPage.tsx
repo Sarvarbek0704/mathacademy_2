@@ -56,26 +56,12 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
 const STATUS_INFO: Record<string, { label: string; color: string; icon: any }> = {
-  UNPAID: {
-    label: "To'lanmagan",
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    icon: AlertCircle,
-  },
-  PARTIAL: {
-    label: "Qisman to'langan",
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    icon: Clock,
-  },
-  PAID: {
-    label: "To'langan",
-    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    icon: CheckCircle2,
-  },
-  WAIVED: {
-    label: "Bekor qilingan",
-    color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400',
-    icon: Receipt,
-  },
+  UNPAID:        { label: "To'lanmagan",      color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',       icon: AlertCircle },
+  PENDING:       { label: "To'lanmagan",      color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',       icon: AlertCircle },
+  PARTIAL:       { label: "Qisman to'langan", color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
+  PARTIALLY_PAID:{ label: "Qisman to'langan", color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
+  PAID:          { label: "To'langan",        color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
+  WAIVED:        { label: "Bekor qilingan",   color: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400', icon: Receipt },
 };
 
 const INVOICE_TYPE_INFO: Record<string, { label: string; icon: any; color: string }> = {
@@ -106,7 +92,7 @@ export default function BillingPage() {
     queryFn: async () => (await api.get('/staff/billing/summary')).data,
   });
   const summary = summaryRes?.data || summaryRes || {};
-  const trend: any[] = summary.trend || [];
+  const trend: any[] = summary.revenueTrend || summary.trend || [];
 
   const { data: invoicesRes, isLoading: invoicesLoading } = useQuery({
     queryKey: ['staff', 'billing', 'invoices', page, statusFilter, typeFilter, search],
@@ -140,7 +126,7 @@ export default function BillingPage() {
     }
     recordPaymentMut.mutate({
       invoiceId: selectedInvoice.id,
-      amount: Number(payForm.amount),
+      paidAmount: Number(payForm.amount),
       method: payForm.method,
       note: payForm.note?.trim() || undefined,
     });
@@ -315,9 +301,10 @@ export default function BillingPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">Barchasi</SelectItem>
-                  {Object.entries(STATUS_INFO).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                  ))}
+                  <SelectItem value="PENDING">To'lanmagan</SelectItem>
+                  <SelectItem value="PARTIALLY_PAID">Qisman to'langan</SelectItem>
+                  <SelectItem value="PAID">To'langan</SelectItem>
+                  <SelectItem value="WAIVED">Bekor qilingan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -387,7 +374,7 @@ export default function BillingPage() {
                           {dayjs(inv.issuedAt || inv.createdAt).format('DD.MM.YYYY')}
                         </TableCell>
                         <TableCell className="py-2.5 text-right pr-5">
-                          {inv.status !== 'PAID' && inv.status !== 'WAIVED' && (
+                          {!['PAID', 'WAIVED'].includes(inv.status) && (
                             <Button
                               size="sm"
                               variant="outline"

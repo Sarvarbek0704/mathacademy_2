@@ -127,12 +127,12 @@ export class StudentListQuery {
   sortDir?: 'asc' | 'desc';
 
   // Pagination
-  @ApiPropertyOptional({ example: 50, minimum: 1, maximum: 200 })
+  @ApiPropertyOptional({ example: 50, minimum: 1, maximum: 1000 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(1000)
   limit?: number = 50;
 
   @ApiPropertyOptional({ example: 0, minimum: 0 })

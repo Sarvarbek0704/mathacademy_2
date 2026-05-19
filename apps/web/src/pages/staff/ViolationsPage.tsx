@@ -35,7 +35,7 @@ export default function ViolationsPage() {
   const severityColors: Record<string, string> = { LOW: 'info', MEDIUM: 'warning', HIGH: 'destructive' };
 
   const columns: Column<any>[] = [
-    { key: 'student', title: "O'quvchi", render: (i) => i.student?.fullName || i.student?.full_name || '-' },
+    { key: 'student', title: "O'quvchi", render: (i) => i.studentName || i.student?.fullName || i.student?.full_name || '-' },
     { key: 'ruleCode', title: 'Turi', render: (i) => i.ruleCode || i.rule_code || '-' },
     { key: 'severity', title: 'Daraja', render: (i) => <StatusBadge status={severityColors[i.severity] || 'info'} label={severityLabels[i.severity] || i.severity} /> },
     { key: 'detectedAt', title: 'Sana', render: (i) => (i.detectedAt || i.detected_at) ? new Date(i.detectedAt || i.detected_at).toLocaleDateString('uz') : '-' },

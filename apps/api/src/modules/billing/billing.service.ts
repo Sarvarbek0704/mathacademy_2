@@ -1503,21 +1503,18 @@ export class BillingService {
   async getBillingSummary(tenantId: string) {
     const tenant_id = toBigInt(tenantId, 'tenantId');
 
-    const [unpaidCount, unpaidTotal] = await this.prisma.$transaction([
-      this.prisma.invoices.count({
-        where: {
-          tenant_id,
-          status: { in: ['PENDING', 'PARTIALLY_PAID'] },
-        },
-      }),
-      this.prisma.invoices.aggregate({
-        where: {
-          tenant_id,
-          status: { in: ['PENDING', 'PARTIALLY_PAID'] },
-        },
-        _sum: { amount: true },
-      }),
-    ]);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [unpaidCount, unpaidTotal, partialCount, partialTotal, totalInvoices, currentMonthRevenue] =
+      await this.prisma.$transaction([
+        this.prisma.invoices.count({ where: { tenant_id, status: 'PENDING' } }),
+        this.prisma.invoices.aggregate({ where: { tenant_id, status: 'PENDING' }, _sum: { amount: true } }),
+        this.prisma.invoices.count({ where: { tenant_id, status: 'PARTIALLY_PAID' } }),
+        this.prisma.invoices.aggregate({ where: { tenant_id, status: 'PARTIALLY_PAID' }, _sum: { amount: true } }),
+        this.prisma.invoices.count({ where: { tenant_id } }),
+        this.prisma.payments.aggregate({ where: { tenant_id, paid_at: { gte: monthStart } }, _sum: { paid_amount: true } }),
+      ]);
 
     // Revenue trend (last 6 months)
     const sixMonthsAgo = new Date();
@@ -1579,6 +1576,10 @@ export class BillingService {
     return {
       unpaidCount,
       unpaidTotal: unpaidTotal._sum.amount?.toString() || '0',
+      partialCount,
+      partialTotal: partialTotal._sum.amount?.toString() || '0',
+      totalInvoices,
+      currentMonthRevenue: currentMonthRevenue._sum.paid_amount?.toString() || '0',
       revenueTrend: Array.from(monthMap.values()).reverse(),
     };
   }
