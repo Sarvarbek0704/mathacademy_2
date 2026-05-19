@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { AppLogoIcon } from '@/components/shared/AppLogo';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api';
 
 export default function GuardianLogin() {
   const [studentId, setStudentId] = useState('');
@@ -32,8 +33,8 @@ export default function GuardianLogin() {
       await login('GUARDIAN', { studentId, password });
       toast.success('Muvaffaqiyatli kirdingiz!');
       navigate('/guardian/dashboard');
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Student ID yoki parol noto'g'ri";
+    } catch (err) {
+      const msg = getApiErrorMessage(err, "Student ID yoki parol noto'g'ri");
       toast.error('Kirish xatosi', { description: msg });
     } finally {
       setLoading(false);
